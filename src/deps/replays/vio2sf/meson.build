@@ -1,0 +1,23 @@
+replay_inc = include_directories('.')
+replay_includes += replay_inc
+replay_libs += static_library('replay-vio2sf',
+  files('desmume/armcpu.c',
+    'desmume/arm_instructions.c',
+    'desmume/barray.c',
+    'desmume/bios.c',
+    'desmume/cp15.c',
+    'desmume/FIFO.c',
+    'desmume/GPU.c',
+    'desmume/isqrt.c',
+    'desmume/matrix.c',
+    'desmume/mc.c',
+    'desmume/MMU.c',
+    'desmume/NDSSystem.c',
+    'desmume/resampler.c',
+    'desmume/SPU.cpp',
+    'desmume/state.c',
+    'desmume/thumb_instructions.c'),
+  include_directories: replay_inc, dependencies: [zlib, math],
+  c_args: common_flags + [],
+  cpp_args: common_flags + [],
+  gnu_symbol_visibility: 'hidden', override_options: ['warning_level=0', 'c_std=gnu11'])

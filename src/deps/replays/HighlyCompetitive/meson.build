@@ -1,0 +1,23 @@
+replay_inc = include_directories('.')
+replay_includes += replay_inc
+replay_libs += static_library('replay-HighlyCompetitive',
+  files('snes9x/apu/apu.cpp',
+    'snes9x/apu/bapu/dsp/sdsp.cpp',
+    'snes9x/apu/bapu/dsp/SPC_DSP.cpp',
+    'snes9x/apu/bapu/smp/smp.cpp',
+    'snes9x/apu/bapu/smp/smp_state.cpp',
+    'snes9x/cpu.cpp',
+    'snes9x/cpuexec.cpp',
+    'snes9x/cpuops.cpp',
+    'snes9x/dma.cpp',
+    'snes9x/globals.cpp',
+    'snes9x/memmap.cpp',
+    'snes9x/ppu.cpp',
+    'snes9x/sa1.cpp',
+    'snes9x/sdd1.cpp',
+    'snes9x/sha256.cpp',
+    'snsf.cpp'),
+  include_directories: replay_inc, dependencies: [zlib, math],
+  c_args: common_flags + ['-DHAVE_STDINT_H', '-DSNSF9X_REMOVED_SDD1', '-DSNSF9X_REMOVED_SA1'],
+  cpp_args: common_flags + ['-DHAVE_STDINT_H', '-DSNSF9X_REMOVED_SDD1', '-DSNSF9X_REMOVED_SA1'],
+  gnu_symbol_visibility: 'hidden', override_options: ['warning_level=0', 'c_std=gnu11'])

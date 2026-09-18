@@ -1,0 +1,15 @@
+replay_libs = []
+replay_includes = []
+subdir('SidPlay')
+subdir('V2')
+subdir('Organya')
+subdir('klystrack')
+subdir('TFMX')
+subdir('HighlyAdvanced')
+subdir('HighlyCompetitive')
+subdir('HighlyExperimental')
+subdir('HighlyQuixotic')
+subdir('HighlyTheoretical')
+subdir('LazyUSF')
+subdir('vio2sf')
+subdir('Hively')

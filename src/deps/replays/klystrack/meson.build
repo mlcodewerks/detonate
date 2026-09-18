@@ -1,0 +1,21 @@
+replay_inc = include_directories('.', 'klystron/src', '.')
+replay_includes += replay_inc
+replay_libs += static_library('replay-klystrack',
+  files('klystron/src/lib/ksnd.c',
+    'klystron/src/snd/cyd.c',
+    'klystron/src/snd/cydchr.c',
+    'klystron/src/snd/cydcrush.c',
+    'klystron/src/snd/cydentry.c',
+    'klystron/src/snd/cydflt.c',
+    'klystron/src/snd/cydfm.c',
+    'klystron/src/snd/cydfx.c',
+    'klystron/src/snd/cydosc.c',
+    'klystron/src/snd/cydrvb.c',
+    'klystron/src/snd/cydwave.c',
+    'klystron/src/snd/freqs.c',
+    'klystron/src/snd/music.c',
+    'klystron/src/snd/pack.c'),
+  include_directories: replay_inc, dependencies: [zlib, math],
+  c_args: common_flags + ['-DSTEREOOUTPUT', '-DNOSDL_MIXER', '-D_USE_MATH_DEFINES'],
+  cpp_args: common_flags + ['-DSTEREOOUTPUT', '-DNOSDL_MIXER', '-D_USE_MATH_DEFINES'],
+  gnu_symbol_visibility: 'hidden', override_options: ['warning_level=0', 'c_std=gnu11'])
