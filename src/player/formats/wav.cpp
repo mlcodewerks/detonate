@@ -1,104 +1,61 @@
+// libretro-common's rwav handles RIFF/WAVE. Retain Wave64 through dr_wav.
 #define DR_WAV_IMPLEMENTATION
-#include <dr_wav.h>
-#include "audiodecode.h"
-#include <stdint.h>
-#include <stdbool.h>
-
-
-class auddecode_wav : public auddecode
+#include "dr_wav.h"
+#include "decoder_base.h"
+class wave64_decoder final : public decoder_base
 {
-private:
-    bool isplaying2;
-    drwav stream;
-    bool repeat;
-    bool isplaying;
+    drwav stream_ = {};
+    bool opened_ = false;
+    std::vector<uint8_t> bytes_;
+    size_t read_frames(float *out, size_t frames) override
+    {
+        return static_cast<size_t>(drwav_read_pcm_frames_f32(&stream_, frames, out));
+    }
+    bool seek_frame(uint64_t frame) override
+    {
+        return opened_ && drwav_seek_to_pcm_frame(&stream_, frame);
+    }
+
 public:
-    ~auddecode_wav()
+    ~wave64_decoder() override { stop(); }
+    std::vector<std::string> file_types() override { return {"w64"}; }
+    bool open(const char *filename, float *rate, bool loop) override
     {
+        return open_bytes(filename, read_audio_file(filename), rate, loop);
     }
-
-    auddecode_wav()
+    bool open_memory(const std::string &name, const std::vector<uint8_t> &bytes, float *rate, bool loop) override
     {
-        isplaying2 = false;
+        return open_bytes(name.c_str(), bytes, rate, loop);
     }
-
-    bool open(const char *filename, float *samplerate, bool loop)
+    bool open_bytes(const char *, std::vector<uint8_t> bytes, float *rate, bool loop)
     {
-        if (!drwav_init_file(&stream, filename, NULL))
+        stop();
+        bytes_ = std::move(bytes);
+        opened_ = drwav_init_memory(&stream_, bytes_.data(), bytes_.size(), nullptr);
+        if (!opened_)
+            return false;
+        rate_ = stream_.sampleRate;
+        channels_ = stream_.channels;
+        if (!rate_ || !channels_ || channels_ > 8)
         {
+            stop();
             return false;
         }
-        *samplerate = stream.sampleRate;
-        repeat = loop;
-        isplaying2 = true;
+        length_ = stream_.totalPCMFrameCount;
+        position_ = 0;
+        *rate = float(rate_);
+        playing_ = true;
+        loop_ = loop;
+        read_tags(bytes_);
         return true;
     }
-
-    virtual void seek(unsigned ms)
+    void stop() override
     {
-        drwav_uint64 index = ms;
-        index *= stream.sampleRate;
-        index /= 1000;
-        drwav_seek_to_pcm_frame(&stream, index);
-    }
-
-    void stop()
-    {
-        if (isplaying2)
-            isplaying2 = false;
-        if (&stream)
-            drwav_uninit(&stream);
-    }
-
-    bool is_playing()
-    {
-        return isplaying2;
-    }
-
-    unsigned song_duration()
-    {
-        drwav_uint64 index;
-        drwav_get_length_in_pcm_frames(&stream, &index);
-        index *= 1000ull;
-        index /= stream.sampleRate;
-        return index;
-    }
-
-    const char *song_title()
-    {
-        return NULL;
-    }
-
-    std::vector <std::string> file_types()
-    {
-        std::vector<std::string>  a3 = { "wav","w64","aiff" };
-        return a3;
-    }
-
-    void mix(float *&buffer_samps, unsigned &count)
-    {
-        float temp_buffer[count * 4 * sizeof(float)] = {0};
-        unsigned temp_samples = 0;
-        if (isplaying2)
-        {
-        again:
-            temp_samples = (unsigned)drwav_read_pcm_frames_f32(&stream,count, temp_buffer);
-            if (temp_samples == 0)
-            {
-                if (repeat)
-                {
-                    drwav_seek_to_pcm_frame(&stream, 0);
-                    goto again;
-                }
-                isplaying2 = false;
-            }
-        }
-        buffer_samps = temp_buffer;
-        count = temp_samples;
+        metadata_.clear();
+        if (opened_)
+            drwav_uninit(&stream_);
+        opened_ = playing_ = false;
+        bytes_.clear();
     }
 };
-
-auddecode *create_wav()
-{
-    return new auddecode_wav;
-}
+auddecode *create_wav() { return new wave64_decoder; }

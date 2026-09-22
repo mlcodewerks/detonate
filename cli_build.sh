@@ -1,24 +1,12 @@
-#!/bin/bash
-currentDir=$(
-  cd $(dirname "$0")
-  pwd
-)
-install_direct="$currentDir/compile_dir"
-if [ -d "$currentDir/builddir" ] 
-then
-    rm -r "$currentDir/builddir"
-    mkdir "$currentDir/builddir"
+#!/usr/bin/env bash
+set -euo pipefail
+cd -- "$(dirname -- "$0")"
+build_dir="${1:-builddir}"
+if [[ -f "$build_dir/meson-private/coredata.dat" ]]; then
+    meson setup --reconfigure "$build_dir"
 else
-    mkdir "$currentDir/builddir"
-fi;
-
-if [ -d "$install_direct" ] 
-then
-    mkdir "$install_direct"
-fi;
-
-CC=gcc CXX=g++ CC_LD=g++ meson setup builddir
-meson builddir
-ninja -C builddir -f build.ninja
-cd builddir && meson install
-
+    meson setup "$build_dir"
+fi
+meson compile -C "$build_dir"
+meson test -C "$build_dir" --print-errorlogs
+meson install -C "$build_dir"

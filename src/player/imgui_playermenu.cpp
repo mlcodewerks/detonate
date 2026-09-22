@@ -1,456 +1,454 @@
-#include <stdio.h>
 #include "imgui.h"
-#include <filesystem>
-#include <algorithm>
-#include <vector>
-#include <string>
 #include "imgui_font.h"
-#include "imgui_internal.h"
 #include "forkawesome.h"
 #include "IconsForkAwesome.h"
 #include "audiodecode.h"
-
-int window_width, window_height;
-struct FileRecord
-{
-    bool isDir = false;
-    std::filesystem::path name;
-    std::string showName;
-    std::filesystem::path extension;
-};
-std::vector<FileRecord> fileRecords_;
-std::filesystem::path pwd_;
-std::string selected_fname;
-std::string format_string;
-int toseekto = 0;
-
-void resizeui(int width, int height)
-{
-    window_width = width;
-    window_height = height;
-}
-
-static void ToolTip(const char *desc)
-{
-    if (ImGui::IsItemHovered())
-    {
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        ImGui::TextUnformatted(desc);
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    }
-}
-
+#include "visualization.h"
+#include "file_browser.h"
+#include <algorithm>
+#include <filesystem>
+#include <string>
+#include <vector>
+#include <future>
+#include <functional>
+#include <chrono>
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-inline std::uint32_t GetDrivesBitMask()
-{
-    const DWORD mask = GetLogicalDrives();
-    std::uint32_t ret = 0;
-    for (int i = 0; i < 26; ++i)
-    {
-        if (!(mask & (1 << i)))
-        {
-            continue;
-        }
-        const char rootName[4] = {static_cast<char>('A' + i), ':', '\\', '\0'};
-        const UINT type = GetDriveTypeA(rootName);
-        if (type == DRIVE_REMOVABLE || type == DRIVE_FIXED || type == DRIVE_REMOTE)
-        {
-            ret |= (1 << i);
-        }
-    }
-    return ret;
-}
-static uint32_t drives_ = GetDrivesBitMask();
 #endif
-
-template <class Functor>
-struct ScopeGuard
+namespace fs = std::filesystem;
+namespace
 {
-    ScopeGuard(Functor &&t) : func(std::move(t)) {}
-
-    ~ScopeGuard() { func(); }
-
-private:
-    Functor func;
-};
-
-bool HyperLink(const char *label, bool underlineWhenHoveredOnly = false)
-{
-    ImGuiStyle &style = ImGui::GetStyle();
-    const ImU32 linkColor = ImGui::ColorConvertFloat4ToU32(style.Colors[ImGuiCol_TextDisabled]);
-    const ImU32 linkHoverColor = ImGui::ColorConvertFloat4ToU32(style.Colors[ImGuiCol_Text]);
-    const ImU32 linkFocusColor = ImGui::ColorConvertFloat4ToU32(style.Colors[ImGuiCol_Text]);
-
-    const ImGuiID id = ImGui::GetID(label);
-
-    ImGuiWindow *const window = ImGui::GetCurrentWindow();
-    ImDrawList *const draw = ImGui::GetWindowDrawList();
-
-    const ImVec2 pos(window->DC.CursorPos.x, window->DC.CursorPos.y + window->DC.CurrLineTextBaseOffset);
-    const ImVec2 size = ImGui::CalcTextSize(label);
-    ImRect bb(pos, {pos.x + size.x, pos.y + size.y});
-
-    ImGui::ItemSize(bb, 0.0f);
-    if (!ImGui::ItemAdd(bb, id))
-        return false;
-
-    bool isHovered = false;
-    const bool isClicked = ImGui::ButtonBehavior(bb, id, &isHovered, nullptr);
-    const bool isFocused = ImGui::IsItemFocused();
-
-    const ImU32 color = isHovered ? linkHoverColor : isFocused ? linkFocusColor
-                                                               : linkColor;
-
-    draw->AddText(bb.Min, color, label);
-
-    if (isFocused)
-        draw->AddRect(bb.Min, bb.Max, color);
-    else if (!underlineWhenHoveredOnly || isHovered)
-        draw->AddLine({bb.Min.x, bb.Max.y}, bb.Max, color);
-
-    return isClicked;
-}
-
-std::string format_duration(std::chrono::milliseconds ms)
-{
-    using namespace std::chrono;
-    auto secs = duration_cast<seconds>(ms);
-    ms -= std::chrono::duration_cast<milliseconds>(secs);
-    auto mins = std::chrono::duration_cast<minutes>(secs);
-    secs -= std::chrono::duration_cast<seconds>(mins);
-    auto hour = std::chrono::duration_cast<hours>(mins);
-    mins -= std::chrono::duration_cast<minutes>(hour);
-    std::string ss;
-    if (hour.count() > 0)
+    file_browser browser;
+    directory_playlist playlist;
+    void play_item(const playlist_item &item)
     {
-        ss += std::to_string(hour.count());
-        ss += "h";
-        ss += " : ";
+        if (item.members)
+            music_play_archive_async(item.members, item.member, item.track);
+        else
+            music_play_async(item.source.empty() ? item.key : item.source, item.track);
     }
-    if (mins.count() > 0)
+    struct navigation_result
     {
-        ss += std::to_string(mins.count());
-        ss += "m";
-        ss += " : ";
-    }
-    ss += std::to_string(secs.count());
-    ss += "s";
-    return ss;
-}
-
-void menu_setdir(const char *dir)
-{
-    std::filesystem::path pah(dir);
-    pwd_ = pah.parent_path();
-    auto rombrowse_update = [=]()
-    {
-        fileRecords_ = {FileRecord{true, "..", ICON_FK_FOLDER " ..", ""}};
-
-        for (auto &p : std::filesystem::directory_iterator(pwd_))
-        {
-            FileRecord rcd = {FileRecord{false, "", "", ""}};
-
-            if (p.is_regular_file())
-            {
-                rcd.isDir = false;
-            }
-            else if (p.is_directory())
-            {
-                rcd.isDir = true;
-            }
-            else
-            {
-                continue;
-            }
-
-            rcd.name = p.path().filename();
-            if (rcd.name.empty())
-                continue;
-            std::string str;
-            if (!rcd.isDir)
-            {
-                rcd.extension = p.path().filename().extension();
-                if (rcd.extension.empty())
-                    continue;
-                std::string str2 = rcd.extension.string();
-                str2.erase(str2.begin());
-                bool ismusicfile = (format_string.find(str2) != std::string::npos);
-                if (!ismusicfile)
-                    continue;
-                else
-                    str = ICON_FK_MUSIC " ";
-            }
-            else
-                str = ICON_FK_FOLDER " ";
-            rcd.showName = str + p.path().filename().string();
-            fileRecords_.push_back(rcd);
-        }
-        std::sort(fileRecords_.begin(), fileRecords_.end(),
-                  [](const FileRecord &L, const FileRecord &R)
-                  {
-                      return (L.isDir ^ R.isDir) ? L.isDir : (L.name < R.name);
-                  });
+        bool content = false, success = true;
+        std::string audio, error;
+        uint64_t generation = 0;
+        std::vector<playlist_item> songs;
     };
-    rombrowse_update();
+    using navigation = std::function<navigation_result()>;
+    std::future<navigation_result> browser_job;
+    navigation pending_navigation;
+    std::string browser_job_error;
+    int content_status = 1;
+    uint64_t content_generation = 0;
+    bool content_audio = false;
+    void launch_navigation(navigation work)
+    {
+        browser_job_error.clear();
+        try
+        {
+            browser_job = std::async(std::launch::async, std::move(work));
+        }
+        catch (const std::exception &e)
+        {
+            browser_job_error = e.what();
+            content_status = -1;
+        }
+    }
+    void request_navigation(navigation work)
+    {
+        if (browser_job.valid())
+            pending_navigation = std::move(work);
+        else
+            launch_navigation(std::move(work));
+    }
+    void finish_browser_job()
+    {
+        if (!browser_job.valid())
+            return;
+        navigation_result result;
+        try
+        {
+            result = browser_job.get();
+        }
+        catch (const std::exception &e)
+        {
+            result.success = false;
+            result.error = e.what();
+        }
+        if (pending_navigation)
+        {
+            auto next = std::move(pending_navigation);
+            pending_navigation = {};
+            launch_navigation(std::move(next));
+            return; // An obsolete request must never start its song.
+        }
+        if (result.content && result.generation != content_generation)
+            return;
+        browser_job_error = std::move(result.error);
+        if (result.content || !result.success)
+        {
+            content_status = result.success ? 1 : -1;
+            if (result.success && !result.audio.empty())
+            {
+                if (const auto *item = playlist.start(std::move(result.songs), result.audio))
+                    play_item(*item);
+                else
+                    music_play_async(std::move(result.audio));
+                content_audio = true;
+                content_status = 0;
+            }
+        }
+    }
+    std::string selected, selected_location;
+    int visualization = 1;
+    void draw_visualization()
+    {
+        if (ImGui::Shortcut(ImGuiKey_V))
+            visualization = (visualization + 1) % 3;
+        ImGui::SetNextItemWidth(180.0f);
+        ImGui::Combo("Visualization", &visualization, "Off\0Oscilloscope\0Spectrum bars\0");
+        ImGui::SetItemTooltip("Press V to cycle views.");
+        if (!visualization)
+            return;
+
+        const auto &data = music_visualization();
+        const float height = std::clamp(ImGui::GetIO().DisplaySize.y * 0.25f, 100.0f, 200.0f);
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const ImVec2 size(std::max(1.0f, ImGui::GetContentRegionAvail().x), height);
+        ImGui::InvisibleButton("##visualization", size);
+        auto *draw = ImGui::GetWindowDrawList();
+        const ImVec2 end(origin.x + size.x, origin.y + size.y);
+        draw->AddRectFilled(origin, end, IM_COL32(12, 18, 26, 255), 4.0f);
+        draw->PushClipRect(origin, end, true);
+        const float left = origin.x + 30.0f, right = end.x - 10.0f;
+        const float top = origin.y + 10.0f, bottom = end.y - 24.0f;
+        const ImU32 grid = IM_COL32(40, 53, 65, 255);
+        for (int i = 0; i <= 4; ++i)
+        {
+            float y = top + (bottom - top) * i / 4.0f;
+            draw->AddLine(ImVec2(left, y), ImVec2(right, y), grid);
+        }
+        if (visualization == 1)
+        {
+            const ImU32 colors[] = {IM_COL32(69, 221, 187, 255), IM_COL32(100, 171, 255, 255)};
+            for (int channel = 0; channel < 2; ++channel)
+            {
+                const auto &wave = channel ? data.right : data.left;
+                const float center = top + (bottom - top) * (channel ? 0.75f : 0.25f);
+                draw->AddText(ImVec2(origin.x + 8, center - 8), colors[channel], channel ? "R" : "L");
+                std::array<ImVec2, visualization_data::waveform_size> points;
+                for (size_t i = 0; i < wave.size(); ++i)
+                    points[i] = ImVec2(left + (right - left) * float(i) / float(wave.size() - 1),
+                                       center - wave[i] * (bottom - top) * 0.23f);
+                draw->AddPolyline(points.data(), int(points.size()), colors[channel], ImDrawFlags_None, 1.5f);
+            }
+            draw->AddText(ImVec2(left, bottom + 4), IM_COL32(155, 169, 182, 255), "Stereo waveform - 11.6 ms");
+        }
+        else
+        {
+            const float step = (right - left) / data.spectrum.size();
+            for (size_t i = 0; i < data.spectrum.size(); ++i)
+            {
+                const float x = left + float(i) * step;
+                const float y = bottom - data.spectrum[i] * (bottom - top);
+                draw->AddRectFilledMultiColor(ImVec2(x + 1, y), ImVec2(x + step - 2, bottom),
+                                              IM_COL32(90, 228, 183, 255), IM_COL32(90, 228, 183, 255),
+                                              IM_COL32(43, 105, 182, 255), IM_COL32(43, 105, 182, 255));
+            }
+            draw->AddText(ImVec2(left, bottom + 4), IM_COL32(155, 169, 182, 255), "22 Hz");
+            const char *label = "20 kHz | -60 to 0 dBFS";
+            draw->AddText(ImVec2(right - ImGui::CalcTextSize(label).x, bottom + 4), IM_COL32(155, 169, 182, 255), label);
+        }
+        draw->PopClipRect();
+    }
+    std::string path_text(const fs::path &p)
+    {
+        const auto utf8 = p.u8string();
+        return std::string(utf8.begin(), utf8.end());
+    }
+    std::string time_text(unsigned ms)
+    {
+        unsigned seconds = ms / 1000;
+        char text[40];
+        std::snprintf(text, sizeof(text), "%u:%02u", seconds / 60, seconds % 60);
+        return text;
+    }
 }
-
-void menus_init(float dpi_scaling, int width, int height)
+void menus_poll()
 {
-    resizeui(width, height);
-
+    music_poll();
+    if (const auto *next = playlist.poll(music_loading(), music_isplaying(), music_ispaused(), !music_error().empty()))
+        play_item(*next);
+    if (browser_job.valid() && browser_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+        finish_browser_job();
+    if (content_audio && !music_loading())
+    {
+        content_audio = false;
+        content_status = music_error().empty() ? 1 : -1;
+    }
+}
+void menu_request_content(const char *path)
+{
+    std::string name = path ? path : "";
+    selected = name;
+    selected_location.clear();
+    content_status = 0;
+    content_audio = false;
+    playlist.stop();
+    music_stop_async();
+    request_navigation([name = std::move(name), generation = ++content_generation]
+                       {
+        navigation_result result;
+        result.content = true;
+        result.generation = generation;
+        const fs::path target = name.empty() ? fs::current_path() : fs::path(reinterpret_cast<const char8_t *>(name.c_str()));
+        result.success = browser.open(target);
+        result.error = browser.error();
+        if (result.success && !browser.in_subsongs() && !name.empty() && !fs::is_directory(target) &&
+            (!is_music_archive(name) || auddecode_supports(name.c_str()))) {
+            result.audio = path_text(fs::absolute(target).lexically_normal());
+            result.songs = browser.playlist();
+        }
+        return result; });
+}
+int menu_load_status()
+{
+    menus_poll();
+    return content_status;
+}
+void menus_wait()
+{
+    while (browser_job.valid())
+        finish_browser_job();
+    music_wait();
+    menus_poll();
+}
+void menus_shutdown()
+{
+    playlist.stop();
+    ++content_generation;
+    pending_navigation = {};
+    while (browser_job.valid())
+        finish_browser_job();
+    music_wait();
+    browser = file_browser{};
+    content_audio = false;
+    content_status = 1;
+}
+void menus_init(float scale, int width, int height)
+{
+    menus_wait();
+    browser_job_error.clear();
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    io.DisplaySize = ImVec2((float)width, (float)height);
-#ifdef LIBRETRO
-    io.MouseDrawCursor = true;
-#endif
-    io.IniFilename = NULL;
-    ImFontConfig font_cfg;
-    font_cfg.FontDataOwnedByAtlas = false;
-    static const ImWchar icons_ranges[] = {ICON_MIN_FK, ICON_MAX_FK, 0};
-    io.Fonts->AddFontFromMemoryTTF((unsigned char *)Roboto_Regular, sizeof(Roboto_Regular), dpi_scaling * 12.0f, &font_cfg, io.Fonts->GetGlyphRangesJapanese());
-    font_cfg.MergeMode = true;
-    font_cfg.GlyphMinAdvanceX = 13.0f;                                                                                                                                 // Use if you want to make the icon monospaced
-    io.Fonts->AddFontFromMemoryCompressedTTF((unsigned char *)forkawesome_compressed_data, forkawesome_compressed_size, dpi_scaling * 12.0f, &font_cfg, icons_ranges); // Merge into first font
-    io.Fonts->Build();
-    ImGuiStyle *style = &ImGui::GetStyle();
-    style->TabRounding = 4;
-    style->ScrollbarRounding = 9;
-    style->WindowRounding = 7;
-    style->GrabRounding = 3;
-    style->FrameRounding = 3;
-    style->PopupRounding = 4;
-    style->ChildRounding = 4;
-    style->ScrollbarSize = 10.0f;
-    style->ScaleAllSizes(dpi_scaling);
+    io.IniFilename = nullptr;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.DisplaySize = ImVec2(float(width), float(height));
+    ImFontConfig config;
+    config.FontDataOwnedByAtlas = false;
+    io.Fonts->AddFontFromMemoryTTF((void *)Roboto_Regular, sizeof(Roboto_Regular), scale * 12.0f, &config);
+    static const ImWchar ranges[] = {ICON_MIN_FK, ICON_MAX_FK, 0};
+    config.MergeMode = true;
+    config.GlyphMinAdvanceX = scale * 12.0f;
+    io.Fonts->AddFontFromMemoryCompressedTTF(forkawesome_compressed_data, forkawesome_compressed_size, scale * 12.0f, &config, ranges);
     ImGui::StyleColorsDark();
-    pwd_ = std::filesystem::current_path();
-    format_string = auddecode_formats();
-    menu_setdir(pwd_.string().c_str());
-}
+    ImGui::GetStyle().FrameRounding = 3.0f;
+    ImGui::GetStyle().ScaleAllSizes(scale);
+    selected.clear();
+    selected_location.clear();
+    browser = file_browser{};
 
+    playlist.stop();
+    music_repeat(playlist.playback == directory_playlist::mode::repeat_song);
+}
 void menus_run()
 {
-    ImVec2 winsize{window_width, window_height};
-    float mainmenu_y = 0.0;
+    menus_poll();
     ImGui::NewFrame();
-    ImGuiIO &io = ImGui::GetIO();
-    int ypos = 0;
-
-    ImGui::SetNextWindowSize(winsize);
-    ImGui::SetNextWindowPos(ImVec2(0.5f, 0.5f));
-    ImGui::Begin("test", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar);
-
-    if (ImGui::BeginMenuBar())
-    {
-        if (ImGui::BeginMenu("File"))
-        {
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Help "))
-        {
-            ImGui::MenuItem("Dummy");
-            ImGui::EndMenu();
-        }
-        mainmenu_y = ImGui::GetFrameHeight();
-        ImGui::EndMenuBar();
-        winsize.y -= mainmenu_y;
-    }
-    ypos = mainmenu_y;
-    ImGuiStyle &style = ImGui::GetStyle();
-    bool updrecs = false;
-    int height_toolbar = ImGui::GetFrameHeight() * 3.1;
-    ImGui::SetNextWindowSize(ImVec2(window_width, height_toolbar));
-    ImGui::SetNextWindowPos(ImVec2(0.5f, ypos));
-    ImGui::BeginChild("toolbar", ImVec2(window_width, height_toolbar), true, NULL);
-
-    const char currentDrive = static_cast<char>(pwd_.c_str()[0]);
-    const char driveStr[] = {currentDrive, ':', '\0'};
-
-#ifdef _WIN32
-    ImGui::PushItemWidth(4 * ImGui::GetFontSize());
-    if (ImGui::BeginCombo("##select_drive", driveStr))
-    {
-        ScopeGuard guard([&]
-                         { ImGui::EndCombo(); });
-
-        for (int i = 0; i < 26; ++i)
-        {
-            if (!(drives_ & (1 << i)))
-            {
-                continue;
-            }
-
-            const char driveCh = static_cast<char>('A' + i);
-            const char selectableStr[] = {driveCh, ':', '\0'};
-            const bool selected = currentDrive == driveCh;
-
-            if (ImGui::Selectable(selectableStr, selected) && !selected)
-            {
-                char newPwd[] = {driveCh, ':', '\\', '\0'};
-                std::filesystem::path pah(newPwd);
-                menu_setdir(pah.string().c_str());
-            }
-        }
-    }
-    ImGui::PopItemWidth();
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    ImGui::Begin("Detonate", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+    if (ImGui::Button(music_ispaused() ? ICON_FK_PLAY " Resume" : ICON_FK_PAUSE " Pause"))
+        music_pause(!music_ispaused());
     ImGui::SameLine();
-#endif
-
-    int secIdx = 0, newDirLastSecIdx = -1;
-    for (const auto &sec : pwd_)
+    if (ImGui::Button(ICON_FK_STOP " Stop"))
     {
-#ifdef _WIN32
-        if (secIdx == 1)
-        {
-            ++secIdx;
-            continue;
-        }
-#endif
-
-        ImGui::PushID(secIdx);
-        if (secIdx > 0)
-        {
-            ImGui::SameLine();
-            ImGui::Text("/");
-            ImGui::SameLine();
-        }
-        if (HyperLink(sec.string().c_str()))
-        {
-            newDirLastSecIdx = secIdx;
-        }
-        ImGui::PopID();
-
-        ++secIdx;
+        ++content_generation;
+        content_audio = false;
+        content_status = 1;
+        playlist.stop();
+        music_stop_async();
     }
-
-    if (newDirLastSecIdx >= 0)
-    {
-        int i = 0;
-        std::filesystem::path dstDir;
-        for (const auto &sec : pwd_)
-        {
-            if (i++ > newDirLastSecIdx)
-            {
-                break;
-            }
-            dstDir /= sec;
-        }
-
-#ifdef _WIN32
-        if (newDirLastSecIdx == 0)
-        {
-            dstDir /= "\\";
-        }
-#endif
-        pwd_ = dstDir;
-        menu_setdir(pwd_.string().c_str());
-    }
-
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 5.f);
-    ImGui::Button(ICON_FK_PAUSE);
-    ImGui::PopStyleVar(1);
     ImGui::SameLine();
-
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 5.f);
-    ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonHovered]);
-    ImGui::Button(ICON_FK_REPEAT);
-    ImGui::PopStyleColor(1);
-    ImGui::PopStyleVar(1);
-
-    if (music_isplaying() && music_getduration())
+    int mode = int(playlist.playback);
+    if (playlist.shuffled() && mode >= 2)
+        mode += 2;
+    ImGui::SetNextItemWidth(240.0f);
+    if (ImGui::Combo("Playback", &mode, "Play song once\0Repeat song\0Play directory once\0Repeat directory\0Shuffle directory once\0Repeat shuffled directory\0"))
     {
-        int pos = music_getposition();
+        playlist.playback = directory_playlist::mode(mode >= 4 ? mode - 2 : mode);
+        if (playlist.shuffled() != (mode >= 4))
+            playlist.shuffle(mode >= 4);
+        music_repeat(playlist.playback == directory_playlist::mode::repeat_song);
+    }
+    ImGui::SetItemTooltip("Directory playback uses the folder where the song was opened. Play once stops after the last song.\nShuffle plays remaining songs without duplicates; repeat reshuffles each new pass.\nRepeat song follows native loops where available.");
+    ImGui::BeginDisabled(music_loading());
+    const unsigned duration = music_getduration();
+    if (music_islooping() || !duration)
+    {
         ImGui::SameLine();
-        std::string posstring = format_duration(std::chrono::milliseconds(pos));
-        std::string posstring_dr = format_duration(std::chrono::milliseconds(music_getduration()));
-        posstring += " / ";
-        posstring += posstring_dr;
-        static int tooseek = 0;
-        ImGui::PushItemWidth(10 * ImGui::GetFontSize());
-        if (ImGui::SliderInt("Song position", &pos, 0, music_getduration(), posstring.c_str()) && ImGui::IsItemEdited())
-        {
-            std::string tt = format_duration(std::chrono::milliseconds(pos));
-            tooseek = pos;
-            ImGui::SetTooltip(tt.c_str());
-        }
-        ImGui::PopItemWidth();
-
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            music_setposition(tooseek);
+        if (ImGui::Button("Restart"))
+            music_setposition_async(0);
+        ImGui::SameLine();
+        ImGui::Text("%s%s", time_text(music_getposition()).c_str(), music_islooping() ? " (looping)" : "");
     }
-
-    ImGui::EndChild();
-
-    ypos += height_toolbar;
-    winsize.y -= ypos;
-
-    ImGui::SetNextWindowSize(ImVec2(winsize));
-    ImGui::SetNextWindowPos(ImVec2(0.5f, ypos));
-    ImGui::BeginChild("rombrowser", ImVec2(winsize), true,
-                      ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_HorizontalScrollbar);
-
-    float panelHeight = ImGui::GetContentRegionAvail().y;
-    float cellSize = ImGui::CalcTextSize("TEST").y;
-    int items_sz = fileRecords_.size() * cellSize;
-    int columns = (int)(items_sz / (int)panelHeight) + 1;
-    if (columns <= 0)
-        columns = 1;
-    float items = 0;
-    ImGui::Columns(columns, 0, false);
-    panelHeight = ImGui::GetContentRegionAvail().y;
-    for (auto &rsc : fileRecords_)
+    else
     {
-
-        if (!rsc.name.empty() && rsc.name.c_str()[0] == '$')
-            continue;
-        bool selected = rsc.showName == selected_fname;
-        ImGui::Selectable(rsc.showName.c_str(), selected,
-                          ImGuiSelectableFlags_DontClosePopups);
-
-        if (ImGui::IsItemHovered())
+        ImGui::SameLine();
+        static unsigned position = 0;
+        static bool seeking = false;
+        if (!seeking)
+            position = music_getposition();
+        const unsigned minimum = 0;
+        ImGui::SetNextItemWidth(std::max(120.0f, ImGui::GetContentRegionAvail().x - 200.0f));
+        if (ImGui::SliderScalar("##position", ImGuiDataType_U32, &position, &minimum, &duration, ""))
+            seeking = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
         {
-            int w = ImGui::GetColumnWidth();
-            ImVec2 textsz = ImGui::CalcTextSize(rsc.showName.c_str());
-            if (textsz.x - 1 > w)
-                ToolTip(rsc.showName.c_str());
+            music_setposition_async(position);
+            seeking = false;
         }
-
-        if (ImGui::IsItemClicked(0) && ImGui::IsMouseDoubleClicked(0))
-        {
-            if (rsc.isDir)
+        else if (!ImGui::IsItemActive())
+            seeking = false;
+        ImGui::SameLine();
+        ImGui::Text("%s / %s", time_text(position).c_str(), time_text(duration).c_str());
+    }
+    const auto title = music_title();
+    if (!title.empty())
+        ImGui::TextUnformatted(title.c_str());
+    else if (!selected.empty())
+        ImGui::TextUnformatted(selected.c_str());
+    const unsigned tracks = music_trackcount();
+    if (tracks > 1)
+    {
+        const unsigned current = music_currenttrack();
+        ImGui::BeginDisabled(current == 0);
+        if (ImGui::Button("Previous track"))
+            music_settrack_async(current - 1);
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(current + 1 >= tracks);
+        if (ImGui::Button("Next track"))
+            music_settrack_async(current + 1);
+        ImGui::EndDisabled();
+    }
+    ImGui::EndDisabled();
+    if (music_loading())
+        ImGui::TextUnformatted("Loading audio...");
+    if (!music_error().empty())
+        ImGui::TextWrapped("%s", music_error().c_str());
+    draw_visualization();
+    ImGui::Separator();
+    // Only the worker accesses browser while a navigation job is outstanding.
+    if (browser_job.valid())
+    {
+        ImGui::TextUnformatted("Loading browser...");
+        ImGui::End();
+        ImGui::Render();
+        return;
+    }
+    if (!browser_job_error.empty())
+        ImGui::TextWrapped("%s", browser_job_error.c_str());
+    std::function<void()> navigate;
+    if (ImGui::Button(ICON_FK_FOLDER " Up"))
+        navigate = []
+        { browser.up(); };
+    ImGui::SameLine();
+    if (ImGui::Button("Refresh"))
+        navigate = []
+        { browser.refresh(); };
+#ifdef _WIN32
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(90.0f);
+    if (ImGui::BeginCombo("##drive", path_text(browser.directory().root_name()).c_str()))
+    {
+        const DWORD mask = GetLogicalDrives();
+        for (unsigned i = 0; i < 26; ++i)
+            if (mask & (1u << i))
             {
-                pwd_ = (rsc.name != "..") ? (pwd_ / rsc.name) : pwd_.parent_path();
-                updrecs = true;
+                char root[] = {char('A' + i), ':', '/', 0};
+                if (ImGui::Selectable(root))
+                    navigate = [path = fs::path(root)]
+                    { browser.open(path); };
             }
-            else
+        ImGui::EndCombo();
+    }
+#endif
+    ImGui::SameLine();
+    ImGui::TextUnformatted(browser.location().c_str());
+    if (!browser.error().empty())
+        ImGui::TextWrapped("%s", browser.error().c_str());
+    int activate = -1;
+    const auto location = browser.location();
+    const auto &files = browser.entries();
+    if (ImGui::BeginChild("browser", ImVec2(0, 0), ImGuiChildFlags_Borders))
+    {
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(files.size()));
+        while (clipper.Step())
+            for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
             {
-                std::string path2 = std::filesystem::path(std::filesystem::canonical(pwd_) / rsc.name).string();
-                if (music_isplaying())
-                    music_stop();
-                selected_fname = rsc.showName;
-                music_play((const char *)path2.c_str());
+                const auto &file = files[i];
+                ImGui::PushID(i);
+                const auto label = std::string(file.directory || file.archive ? ICON_FK_FOLDER " " : ICON_FK_MUSIC " ") + file.name;
+                if (ImGui::Selectable(label.c_str(), selected_location == location + "/" + file.key, ImGuiSelectableFlags_AllowDoubleClick))
+                {
+                    selected = file.name;
+                    selected_location = location + "/" + file.key;
+                    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) || ImGui::IsKeyPressed(ImGuiKey_Enter))
+                    {
+                        activate = i;
+                    }
+                }
+                if (file.track >= 0 && ImGui::IsItemHovered())
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::TextUnformatted(file.tags.title.c_str());
+                    if (!file.tags.artist.empty())
+                        ImGui::Text("Artist: %s", file.tags.artist.c_str());
+                    if (!file.tags.album.empty())
+                        ImGui::Text("Album: %s", file.tags.album.c_str());
+                    if (file.tags.duration)
+                        ImGui::Text("Duration: %u:%02u", file.tags.duration / 60000, file.tags.duration / 1000 % 60);
+                    ImGui::EndTooltip();
+                }
+                ImGui::PopID();
             }
-        }
-        items += cellSize;
-        if (items <= panelHeight)
-        {
-            items = 0;
-            ImGui::NextColumn();
-        }
     }
     ImGui::EndChild();
     ImGui::End();
-    // Rendering
     ImGui::Render();
-    music_run();
-    if (updrecs)
+    if (activate >= 0)
     {
-        menu_setdir(pwd_.string().c_str());
-        updrecs = false;
+        if (files[activate].directory || files[activate].archive)
+            navigate = [activate]
+            { browser.activate(size_t(activate)); };
+        else
+        {
+            ++content_generation;
+            content_audio = true;
+            content_status = 0;
+            if (const auto *item = playlist.start(browser.playlist(), files[activate].key))
+                play_item(*item);
+        }
+    }
+    if (navigate)
+    {
+        request_navigation([navigate = std::move(navigate)]
+                           {
+            navigate();
+            return navigation_result{false, browser.error().empty(), {}, browser.error(), 0, {}}; });
     }
 }

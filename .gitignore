@@ -1,0 +1,6 @@
+/builddir/
+/build-*/
+/compile_dir/
+/.upstream/
+/libretro-common.zip
+/upstream-libretro-common.json

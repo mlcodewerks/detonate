@@ -1,146 +1,111 @@
-#include "audiodecode.h"
+#include "decoder_base.h"
 #include <wavpack/wavpack.h>
-
-
-class auddecode_wv : public auddecode
+#include <cmath>
+#include <cstring>
+class wavpack_decoder final : public decoder_base
 {
-private:
-    bool isplaying2;
-    WavpackContext *wpc;
-    bool repeat;
-    int sample_r;
-    int bits;
-
-    inline void convintfloatwv(float *dst, const int32_t *src, const size_t N, int bits)
+    WavpackContext *stream_ = nullptr;
+    struct memory_file
     {
-        if (bits == 16)
-            for (size_t i = 0; i < N; ++i)
-                dst[i] = int16_to_float32(src[i]);
-        else if (bits == 24)
-        {
-            const uint8_t *ptr = reinterpret_cast<const uint8_t *>(src);
-            size_t c = 0;
-            for (size_t i = 0; i < N; ++i)
-            {
-                int32_t sample = Pack(ptr[c], ptr[c + 1], ptr[c + 2]);
-                dst[i] = int24_to_float32(sample);
-                c += 4;
-            }
-        }
-        else if (bits == 32)
-            for (size_t i = 0; i < N; ++i)
-                dst[i] = int32_to_float32(src[i]);
+        std::vector<uint8_t> bytes;
+        size_t cursor = 0;
+    } main_, correction_;
+    static int32_t read(void *id, void *data, int32_t wanted)
+    {
+        auto &file = *static_cast<memory_file *>(id);
+        const size_t count = wanted > 0 ? std::min<size_t>(wanted, file.bytes.size() - file.cursor) : 0;
+        if (count)
+            std::memcpy(data, file.bytes.data() + file.cursor, count);
+        file.cursor += count;
+        return static_cast<int32_t>(count);
     }
+    static int64_t tell(void *id) { return static_cast<memory_file *>(id)->cursor; }
+    static int seek_bytes(void *id, int64_t offset)
+    {
+        auto &file = *static_cast<memory_file *>(id);
+        if (offset < 0 || uint64_t(offset) > file.bytes.size())
+            return -1;
+        file.cursor = size_t(offset);
+        return 0;
+    }
+    static int seek_relative(void *id, int64_t delta, int mode)
+    {
+        const auto &file = *static_cast<memory_file *>(id);
+        const int64_t base = mode == SEEK_SET ? 0 : mode == SEEK_CUR ? int64_t(file.cursor)
+                                                                     : int64_t(file.bytes.size());
+        if ((delta > 0 && base > INT64_MAX - delta) || delta < -base)
+            return -1;
+        return seek_bytes(id, base + delta);
+    }
+    static int push_back(void *id, int value)
+    {
+        auto &file = *static_cast<memory_file *>(id);
+        if (!file.cursor)
+            return EOF;
+        --file.cursor;
+        return value;
+    }
+    static int64_t length(void *id) { return static_cast<memory_file *>(id)->bytes.size(); }
+    static int can_seek(void *) { return 1; }
+    std::vector<int32_t> samples_;
+    size_t read_frames(float *out, size_t frames) override
+    {
+        samples_.resize(frames * channels_);
+        size_t got = WavpackUnpackSamples(stream_, samples_.data(), static_cast<uint32_t>(frames));
+        if (WavpackGetMode(stream_) & MODE_FLOAT)
+            std::memcpy(out, samples_.data(), got * channels_ * sizeof(float));
+        else
+        {
+            const float scale = std::ldexp(1.0f, 1 - WavpackGetBitsPerSample(stream_));
+            for (size_t i = 0; i < got * channels_; ++i)
+                out[i] = samples_[i] * scale;
+        }
+        return got;
+    }
+    bool seek_frame(uint64_t frame) override { return stream_ && WavpackSeekSample64(stream_, frame); }
 
 public:
-    ~auddecode_wv()
+    ~wavpack_decoder() override { stop(); }
+    std::vector<std::string> file_types() override { return {"wv"}; }
+    bool open(const char *filename, float *rate, bool loop) override
     {
-        wpc = NULL;
-    }
-
-    auddecode_wv()
-    {
-        isplaying2 = false;
-        wpc = NULL;
-    }
-
-    bool open(const char *filename, float *samplerate, bool loop)
-    {
-        char error[128] = {0};
-        int open_flags = OPEN_DSD_AS_PCM | OPEN_NORMALIZE | OPEN_WVC | OPEN_2CH_MAX;
-        wpc = WavpackOpenFileInput(filename, error, open_flags, 0);
-        if (!wpc)
+        stop();
+        char error[128] = {};
+        main_.bytes = read_audio_file(filename);
+        if (main_.bytes.empty())
+            return false;
+        correction_.bytes = read_audio_file((std::string(filename) + "c").c_str());
+        static WavpackStreamReader64 reader = {read, nullptr, tell, seek_bytes, seek_relative,
+                                               push_back, length, can_seek, nullptr, nullptr};
+        stream_ = WavpackOpenFileInputEx64(&reader, &main_, correction_.bytes.empty() ? nullptr : &correction_,
+                                           error, OPEN_WVC | OPEN_NORMALIZE | OPEN_DSD_AS_PCM, 0);
+        if (!stream_)
+            return false;
+        rate_ = WavpackGetSampleRate(stream_);
+        channels_ = WavpackGetNumChannels(stream_);
+        if (!channels_ || channels_ > 8 || !rate_)
         {
+            stop();
             return false;
         }
-        bits = WavpackGetBitsPerSample(wpc);
-        int nch = WavpackGetReducedChannels(wpc);
-        if (nch > 2)
-        {
-            WavpackCloseFile(wpc);
-            return false;
-        }
-        sample_r = WavpackGetSampleRate(wpc);
-        *samplerate = sample_r;
-        repeat = loop;
-        isplaying2 = true;
+        const int64_t total = WavpackGetNumSamples64(stream_);
+        length_ = total > 0 ? total : 0;
+        position_ = 0;
+        *rate = float(rate_);
+        loop_ = loop;
+        playing_ = true;
+        read_tags(main_.bytes);
         return true;
     }
-
-    virtual void seek(unsigned ms)
+    void stop() override
     {
-        uint64_t index = ms;
-        if (isplaying2)
-        {
-            index *= sample_r;
-            index /= 1000;
-            WavpackSeekSample64(wpc, index);
-        }
-    }
-
-    void stop()
-    {
-        if (isplaying2)
-            isplaying2 = false;
-        if (wpc)
-            WavpackCloseFile(wpc);
-    }
-
-    bool is_playing()
-    {
-        return isplaying2;
-    }
-
-    unsigned song_duration()
-    {
-
-        int64_t total_samps = WavpackGetNumSamples64(wpc);
-        return static_cast<uint32_t>((1000ull * total_samps) / sample_r);
-    }
-
-    const char *song_title()
-    {
-        return NULL;
-    }
-
-    std::vector <std::string> file_types()
-    {
-        std::vector<std::string>  a3 = { "wv" };
-        return a3;
-    }
-
-    void mix(float *&buffer_samps, unsigned &count)
-    {
-        float temp_buffer[count * 4 * sizeof(float)] = {0};
-        int32_t temp_bufferint[count * 4 * sizeof(int32_t)] = {0};
-        unsigned temp_samples = 0;
-        if (isplaying2)
-        {
-        again:
-            int mode = WavpackGetMode(wpc);
-            if (MODE_FLOAT & mode)
-                temp_samples = WavpackUnpackSamples(wpc, reinterpret_cast<int32_t *>(&temp_buffer[0]), count);
-            else
-            {
-                temp_samples = WavpackUnpackSamples(wpc, temp_bufferint, count);
-                convintfloatwv(temp_buffer, temp_bufferint, count * 2, bits);
-            }
-            if (temp_samples == 0)
-            {
-                if (repeat)
-                {
-                    WavpackSeekSample64(wpc, 0);
-                    goto again;
-                }
-                isplaying2 = false;
-            }
-            buffer_samps = temp_buffer;
-            count = temp_samples;
-        }
+        metadata_.clear();
+        if (stream_)
+            WavpackCloseFile(stream_);
+        stream_ = nullptr;
+        main_ = {};
+        correction_ = {};
+        playing_ = false;
     }
 };
-
-auddecode *create_wv()
-{
-    return new auddecode_wv;
-}
+auddecode *create_wv() { return new wavpack_decoder; }

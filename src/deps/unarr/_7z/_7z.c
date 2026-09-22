@@ -5,7 +5,8 @@
 
 #ifdef HAVE_7Z
 
-static void *gSzAlloc_Alloc(ISzAllocPtr self, size_t size) { (void)self; return malloc(size); }
+/* Headers and LZMA dictionaries are allocated before entry sizes can be checked. */
+static void *gSzAlloc_Alloc(ISzAllocPtr self, size_t size) { (void)self; return size <= 256u * 1024u * 1024u ? malloc(size) : NULL; }
 static void gSzAlloc_Free(ISzAllocPtr self, void *ptr) { (void)self; free(ptr); }
 static ISzAlloc gSzAlloc = { gSzAlloc_Alloc, gSzAlloc_Free };
 
@@ -55,6 +56,7 @@ static bool _7z_parse_entry(ar_archive *ar, off64_t offset)
     ar_archive_7z *_7z = (ar_archive_7z *)ar;
     //const CSzFileItem *item = _7z->data.db.PackPositions + offset;
 
+next_entry:
     if (offset < 0 || offset > _7z->data.NumFiles) {
         warn("Offsets must be between 0 and %u", _7z->data.NumFiles);
         return false;
@@ -77,7 +79,8 @@ static bool _7z_parse_entry(ar_archive *ar, off64_t offset)
 
     if (SzArEx_IsDir(&_7z->data, offset)) {
         log("Skipping directory entry \"%s\"", _7z_get_name(ar, false));
-        return _7z_parse_entry(ar, offset + 1);
+        ++offset;
+        goto next_entry;
     }
 
     return true;
@@ -148,7 +151,8 @@ static bool _7z_uncompress(ar_archive *ar, void *buffer, size_t buffer_size)
         return false;
     }
 
-    memcpy(buffer, uncomp->buffer + uncomp->offset + ar->entry_size_uncompressed - uncomp->bytes_left, buffer_size);
+    if (buffer_size)
+        memcpy(buffer, uncomp->buffer + uncomp->offset + ar->entry_size_uncompressed - uncomp->bytes_left, buffer_size);
     uncomp->bytes_left -= buffer_size;
 
     return true;
@@ -172,6 +176,10 @@ ar_archive *ar_open_7z_archive(ar_stream *stream)
     LookToRead2_CreateVTable(&_7z->look_stream, False);
     _7z->look_stream.realStream = &_7z->in_stream.super;
     _7z->look_stream.buf = ISzAlloc_Alloc(&gSzAlloc, 1 << 18);
+    if (!_7z->look_stream.buf) {
+        ar_close_archive(ar);
+        return NULL;
+    }
     _7z->look_stream.bufSize = 1 << 18;
     LookToRead2_INIT(&_7z->look_stream);
 
@@ -185,8 +193,7 @@ ar_archive *ar_open_7z_archive(ar_stream *stream)
     if (res != SZ_OK) {
         if (res != SZ_ERROR_NO_ARCHIVE)
             warn("Invalid 7z archive (failed with error %d)", res);
-        ISzAlloc_Free(&gSzAlloc, _7z->look_stream.buf);
-        free(ar);
+        ar_close_archive(ar);
         return NULL;
     }
 

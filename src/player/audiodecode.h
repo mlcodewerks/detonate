@@ -1,100 +1,94 @@
-#ifndef ad_h_
-#define ad_h_
-
-#include <stdint.h>
-#include <stdbool.h>
-#include <algorithm>
-#include <vector>
-#include <iostream>
+#pragma once
+#include <cstdint>
 #include <string>
+#include <vector>
+#include <memory>
 
-bool music_isplaying();
-void music_stop();
-bool music_play(const char* filename);
-void music_run();
-uint32_t music_getduration();
-uint32_t music_getposition();
-void music_setposition(uint64_t pos);
-
-
-enum sampfmt
-{
-    U8,
-    S8,
-    P16,
-    P24,
-    P32,
-    P64,
-    FLT,
-    DBL,
-    END
-};
-void conv2float(float * dst, const uint8_t * src, const size_t N, sampfmt f);
-
-
-inline int32_t Pack(uint8_t a, uint8_t b, uint8_t c)
-{
-    // uint32_t tmp = ((c & 0x80) ? (0xFF << 24) : 0x00 << 24) | (c << 16) | (b << 8) | (a << 0); // alternate method
-    int32_t x = (c << 16) | (b << 8) | (a << 0);
-    auto sign_extended = (x) | (!!((x) & 0x800000) * 0xff000000);
-    return sign_extended;
-}
-
-#define R_INT16_MAX 32767.f
-#define R_INT24_MAX 8388608.f
-#define R_INT32_MAX 2147483648.f
-static const float R_BYTE_2_FLT = 1.0f / 127.0f;
-#define int8_to_float32(s)  ((float) (s) * R_BYTE_2_FLT)
-#define uint8_to_float32(s)(((float) (s) - 128) * R_BYTE_2_FLT)
-#define int16_to_float32(s) ((float) (s) / R_INT16_MAX)
-#define int24_to_float32(s) ((float) (s) / R_INT24_MAX)
-#define int32_to_float32(s) ((float) (s) / R_INT32_MAX)
-
+// All output is interleaved stereo float PCM. Counts are frames; storage
+// belongs to the decoder and remains valid until its next operation.
 class auddecode
 {
 public:
-	virtual ~auddecode() {}
-
-	virtual bool open(const char *filename ,float *samplerate, bool loop) = 0;
-
-	virtual void seek(unsigned ms) = 0;
-
-   virtual void stop() = 0;
-
+    virtual ~auddecode() = default;
+    virtual bool open(const char *filename, float *rate, bool loop) = 0;
+    virtual bool open_memory(const std::string &, const std::vector<uint8_t> &, float *, bool) { return false; }
+    virtual bool seek(unsigned ms) = 0;
+    virtual void stop() = 0;
     virtual bool is_playing() = 0;
-
+    virtual bool is_module() const { return false; }
+    virtual bool supports_looping() const { return is_module(); }
+    virtual void set_loop(bool) {}
     virtual unsigned song_duration() = 0;
-
-    virtual const char* song_title() = 0;
-
+    virtual const char *song_title() { return nullptr; }
+    virtual const char *song_artist() { return nullptr; }
+    virtual const char *song_album() { return nullptr; }
+    virtual unsigned track_count() const { return 1; }
+    virtual unsigned current_track() const { return 0; }
+    virtual std::string track_title(unsigned) const { return "Track 1"; }
+    virtual bool select_track(unsigned index) { return index == 0 && seek(0); }
     virtual std::vector<std::string> file_types() = 0;
-
-	virtual void mix( float *& buffer_samps, unsigned & count) = 0;
+    virtual void mix(float *&buffer, unsigned &frames) = 0;
 };
+bool music_isplaying();
+bool music_ispaused();
+void music_pause(bool paused);
+void music_repeat(bool repeat);
+bool music_getrepeat();
+bool music_islooping();
+unsigned music_trackcount();
+unsigned music_currenttrack();
+std::string music_tracktitle(unsigned index);
+std::string music_title();
+bool music_settrack(unsigned index);
+void music_stop();
+bool music_play(const char *filename);
+struct archive_member;
+bool music_play_memory(const std::string &name, const std::vector<uint8_t> &bytes,
+                       const std::vector<uint8_t> *rom = nullptr,
+                       const std::vector<archive_member> *companions = nullptr);
+void music_run();
+void music_play_async(std::string filename, int track = -1);
+void music_play_archive_async(std::shared_ptr<const std::vector<archive_member>> members, size_t index, int track = -1);
+void music_stop_async();
+void music_settrack_async(unsigned index);
+void music_setposition_async(uint64_t ms);
+void music_poll();
+bool music_loading();
+void music_wait();
+uint32_t music_getduration();
+uint32_t music_getposition();
+void music_setposition(uint64_t ms);
+const std::string &music_error();
 std::string auddecode_formats();
-auddecode *create_mp3();
-auddecode *create_flac();
-auddecode *create_vorbis();
+bool auddecode_supports(const char *filename);
+auddecode *make_decoder(const char *filename, float *rate);
+struct subsong_tags
+{
+    std::string title, artist, album;
+    unsigned duration = 0;
+};
+std::vector<subsong_tags> music_subsongs(const std::string &name,
+                                         std::shared_ptr<const std::vector<archive_member>> members = {}, size_t member = 0);
+auddecode *create_common();
 auddecode *create_wav();
-auddecode *create_opus();
 auddecode *create_mpc();
 auddecode *create_wv();
-auddecode *create_modules();
-auddecode *create_m4a();
-typedef   auddecode* (*create_filetype)();
-static struct auddecode_factory_ {
-   create_filetype  init; 
- }  auddecode_factory []={
-    create_mp3,
-    create_flac,
-    create_vorbis,
-    create_wav,
-    create_opus,
-    create_mpc,
-    create_wv,
-    create_modules,
-    create_m4a,
-    NULL
- };
+auddecode *create_vgm();
+auddecode *create_gme();
 
- #endif
+auddecode *create_sid();
+auddecode *create_v2m();
+auddecode *create_organya();
+auddecode *create_klystrack();
+auddecode *create_tfmx();
+auddecode *create_hively();
+auddecode *create_psx();
+auddecode *create_sega();
+auddecode *create_qsf();
+auddecode *create_usf();
+auddecode *create_gsf();
+auddecode *create_snsf();
+auddecode *create_2sf();
+
+auddecode *create_futurecomposer();
+auddecode *create_ken();
