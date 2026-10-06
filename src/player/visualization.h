@@ -4,11 +4,14 @@
 #include <cstdint>
 
 struct visualization_data {
-    static constexpr size_t waveform_size = 512, band_count = 32;
+    static constexpr size_t waveform_size = 512, band_count = 32, fft_bins = 1024;
     std::array<float, waveform_size> left{}, right{};
     // Logarithmic bands from one FFT bin (44100 / 2048 Hz) to 20 kHz,
     // normalized from -60 dBFS to 0 dBFS.
     std::array<float, band_count> spectrum{};
+    // Linear bins from a 2048-point FFT, covering 0 to the Nyquist frequency.
+    // Same dB normalization as spectrum; stereo power avoids phase cancellation.
+    std::array<float, fft_bins> fft{};
 };
 
 // Fed only with PCM accepted by the frontend, on the retro_run thread.

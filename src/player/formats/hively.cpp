@@ -1,3 +1,4 @@
+#include "../replayer_settings.h"
 #include "replay_engine.h"
 #include <mutex>
 extern "C"
@@ -87,7 +88,9 @@ namespace
             if (!tune || i >= durations.size())
                 return false;
             duration = durations[i];
-            return hvl_InitSubsong(tune.get(), i);
+            if (!hvl_InitSubsong(tune.get(), i)) return false;
+            hvl_UpdateStereo(tune.get(), replayer_settings::snapshot()[replayer_settings::ahx_separation]);
+            return true;
         }
         bool render(std::vector<float> &out) override
         {

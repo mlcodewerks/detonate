@@ -8,6 +8,9 @@
 #include <shellapi.h>
 #include <mmsystem.h>
 #include "libretro.h"
+#if defined(DETONATE_GL33) || defined(DETONATE_GLES2)
+#define DETONATE_HW
+#endif
 
 #define CORE_API(X)                                                         \
     X(retro_api_version)                                                    \
@@ -54,6 +57,10 @@ static pointer_event *mouse_head, *mouse_tail;
 static WCHAR pending_file[PATH_CHARS], library_path[PATH_CHARS];
 static WORD high_surrogate;
 static const WCHAR *failure;
+static BOOL use_gl, use_gles2;
+#ifdef DETONATE_HW
+#include "win32_gl.h"
+#endif
 
 static void *allocate(SIZE_T size) { return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size); }
 static void discard(void *p)
@@ -381,6 +388,13 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wp, LPARAM l
         PAINTSTRUCT paint;
         RECT client;
         HDC dc = BeginPaint(hwnd, &paint);
+#ifdef DETONATE_HW
+        if (use_gl)
+        {
+            EndPaint(hwnd, &paint);
+            return 0; /* GL presentation runs at the frame clock. */
+        }
+#endif
         GetClientRect(hwnd, &client);
         clear_letterbox(dc, &client);
         if (bitmap)
@@ -509,6 +523,28 @@ static bool RETRO_CALLCONV environment(unsigned command, void *data)
 {
     switch (command)
     {
+    case RETRO_ENVIRONMENT_SET_VARIABLES:
+        return true;
+    case RETRO_ENVIRONMENT_GET_VARIABLE:
+    {
+        struct retro_variable *variable = data;
+        if (lstrcmpA(variable->key, "detonate_renderer")) return false;
+        variable->value = use_gles2 ? "gles2" : use_gl ? "gl33" : "software";
+        return true;
+    }
+#ifdef DETONATE_HW
+    case RETRO_ENVIRONMENT_SET_HW_RENDER:
+    {
+        struct retro_hw_render_callback *request = data;
+        if (!gl.framebuffer || (use_gles2 ? request->context_type != RETRO_HW_CONTEXT_OPENGLES2 :
+            (request->context_type != RETRO_HW_CONTEXT_OPENGL_CORE || request->version_major != 3 || request->version_minor > 3)) || request->depth || request->stencil)
+            return false;
+        request->get_current_framebuffer = gl_framebuffer;
+        request->get_proc_address = gl_proc;
+        copy_bytes(&hw, request, sizeof(hw));
+        return true;
+    }
+#endif
     case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
         return true;
     case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
@@ -528,6 +564,16 @@ static void RETRO_CALLCONV video(const void *pixels, unsigned width, unsigned he
     unsigned row;
     if (!pixels)
         return;
+#ifdef DETONATE_HW
+    if (use_gl)
+    {
+        if (pixels != RETRO_HW_FRAME_BUFFER_VALID || width != gl.width || height != gl.height)
+            failure = L"Expected an OpenGL core frame. Enable the selected renderer in the core build.";
+        else
+            ++video_frames;
+        return;
+    }
+#endif
     if (pixels == RETRO_HW_FRAME_BUFFER_VALID || width != av.geometry.base_width || height != av.geometry.base_height ||
         pitch < width * 4 || pitch > 0x7fffffffU || pitch > (SIZE_T)-1 / height)
     {
@@ -611,6 +657,18 @@ static BOOL load(const WCHAR *path)
         loaded = core_retro_load_game(NULL);
     if (!loaded)
         failure = L"Unable to initialize the Detonate browser.";
+#ifdef DETONATE_HW
+    if (loaded && use_gl && !context_ready)
+    {
+        if (!hw.context_reset)
+        {
+            failure = L"Core did not request OpenGL. Enable the selected renderer in the core build.";
+            return FALSE;
+        }
+        hw.context_reset();
+        context_ready = TRUE;
+    }
+#endif
     if (opened && path && *path)
     {
         WCHAR *title = allocate((lstrlenW(path) + 12) * sizeof(WCHAR));
@@ -674,6 +732,7 @@ static BOOL start(void)
     }
     SetProcessDPIAware();
     cls.lpfnWndProc = window_proc;
+    cls.style = CS_OWNDC;
     cls.hInstance = GetModuleHandleW(NULL);
     cls.hCursor = LoadCursorW(NULL, IDC_ARROW);
     cls.lpszClassName = L"Detonate";
@@ -694,19 +753,32 @@ static BOOL start(void)
         return FALSE;
     }
     resize();
-    info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    info.bmiHeader.biWidth = av.geometry.base_width;
-    info.bmiHeader.biHeight = -(LONG)av.geometry.base_height; /* Top-down XRGB8888. */
-    info.bmiHeader.biPlanes = 1;
-    info.bmiHeader.biBitCount = 32;
-    memory_dc = CreateCompatibleDC(NULL);
-    bitmap = CreateDIBSection(memory_dc, &info, DIB_RGB_COLORS, (void **)&framebuffer, NULL, 0);
-    if (!memory_dc || !bitmap)
+#ifdef DETONATE_HW
+    if (use_gl)
     {
-        failure = L"Unable to create video buffer.";
-        return FALSE;
+        if (!start_gl())
+        {
+            failure = L"Unable to initialize the selected graphics backend (check drivers and EGL/GLES2 DLLs for GLES2).";
+            return FALSE;
+        }
     }
-    old_bitmap = SelectObject(memory_dc, bitmap);
+    else
+#endif
+    {
+        info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth = av.geometry.base_width;
+        info.bmiHeader.biHeight = -(LONG)av.geometry.base_height; /* Top-down XRGB8888. */
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        memory_dc = CreateCompatibleDC(NULL);
+        bitmap = CreateDIBSection(memory_dc, &info, DIB_RGB_COLORS, (void **)&framebuffer, NULL, 0);
+        if (!memory_dc || !bitmap)
+        {
+            failure = L"Unable to create video buffer.";
+            return FALSE;
+        }
+        old_bitmap = SelectObject(memory_dc, bitmap);
+    }
     format.wFormatTag = WAVE_FORMAT_PCM;
     format.nChannels = 2;
     format.nSamplesPerSec = (DWORD)av.timing.sample_rate;
@@ -740,6 +812,10 @@ static void cleanup(void)
 {
     unsigned i;
     release_input();
+#ifdef DETONATE_HW
+    if (context_ready && hw.context_destroy)
+        hw.context_destroy();
+#endif
     if (loaded)
         core_retro_unload_game();
     if (initialized)
@@ -763,6 +839,9 @@ static void cleanup(void)
         DeleteObject(bitmap);
     if (memory_dc)
         DeleteDC(memory_dc);
+#ifdef DETONATE_HW
+    stop_gl();
+#endif
     if (window)
         DestroyWindow(window);
     if (library)
@@ -790,7 +869,7 @@ void __cdecl detonate_entry(void)
         const WCHAR *arg = argv[i];
         if (!lstrcmpW(arg, L"--help") || !lstrcmpW(arg, L"-h"))
         {
-            report(L"Usage: detonate [--core PATH] [FILE]\nDrop a file to open it. F11: fullscreen. Ctrl+Q: quit.\n--frames N --hidden: bounded smoke runs (requires an audio device).");
+            report(L"Usage: detonate [--core PATH] [--gl33 | --gles2] [FILE]\nDrop a file to open it. F11: fullscreen. Ctrl+Q: quit.\n--gl33: OpenGL 3.3 (-Dgl33=true). --gles2: OpenGL ES 2.0 (-Dgles2=true).\n--frames N --hidden: bounded smoke runs (requires an audio device).");
             LocalFree(argv);
             ExitProcess(0);
         }
@@ -815,6 +894,24 @@ void __cdecl detonate_entry(void)
                 frame_limit = frame_limit * 10 + *p++ - '0';
             if (*p || !frame_limit || frame_limit > 1000000)
                 failure = L"Invalid frame count.";
+        }
+        else if (!lstrcmpW(arg, L"--gl33"))
+        {
+#ifdef DETONATE_GL33
+            if (use_gl) failure = L"Select only one graphics backend.";
+            use_gl = TRUE;
+#else
+            failure = L"OpenGL support was not built. Configure with -Dgl33=true.";
+#endif
+        }
+        else if (!lstrcmpW(arg, L"--gles2"))
+        {
+#ifdef DETONATE_GLES2
+            if (use_gl) failure = L"Select only one graphics backend.";
+            use_gl = use_gles2 = TRUE;
+#else
+            failure = L"GLES2 support was not built. Configure with -Dgles2=true.";
+#endif
         }
         else if (!lstrcmpW(arg, L"--hidden"))
             hidden = TRUE;
@@ -870,6 +967,10 @@ void __cdecl detonate_entry(void)
             if (failure)
                 break;
             core_retro_run();
+#ifdef DETONATE_HW
+            if (use_gl && !failure)
+                present_gl();
+#endif
             ++frames;
             if (core_load_async)
             {

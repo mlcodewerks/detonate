@@ -1,3 +1,4 @@
+#include "../replayer_settings.h"
 #include "game_music_io.h"
 #include "gme/gme/gme.h"
 #include "archive_reader.h"
@@ -41,6 +42,18 @@ class gme_decoder final : public decoder_base
     std::vector<int16_t> pcm_;
     unsigned track_ = 0;
     std::string title_;
+    gme_equalizer_t native_eq_{};
+    void apply_settings(Music_Emu *emu)
+    {
+        auto eq = native_eq_;
+        const auto s = replayer_settings::snapshot();
+        if (s[replayer_settings::gme_eq])
+        {
+            eq.treble = s[replayer_settings::gme_treble];
+            eq.bass = s[replayer_settings::gme_bass];
+        }
+        gme_set_equalizer(emu, &eq);
+    }
 
     emulator load(const std::vector<uint8_t> &bytes)
     {
@@ -50,6 +63,8 @@ class gme_decoder final : public decoder_base
         emulator result(raw, gme_delete);
         if (!result || gme_load_data(raw, bytes.data(), long(bytes.size())))
             return emulator(nullptr, gme_delete);
+        gme_equalizer(raw, &native_eq_);
+        apply_settings(raw);
         gme_set_autoload_playback_limit(raw, 0);
         gme_ignore_silence(raw, 1);
         return result;
@@ -99,6 +114,7 @@ class gme_decoder final : public decoder_base
     {
         if (!emu_ || frame > INT_MAX / 2)
             return false;
+        apply_settings(emu_.get());
         gme_ignore_silence(emu_.get(), 1);
         const auto result = gme_seek_samples(emu_.get(), int(frame * 2));
         if (result)

@@ -1,10 +1,16 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include "sdl_input.h"
+#if defined(DETONATE_GL33) || defined(DETONATE_GLES2)
+#define DETONATE_HW
+#endif
 #include <cstdio>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#ifdef DETONATE_HW
+#include "gl_video.h"
+#endif
 
 namespace
 {
@@ -53,6 +59,16 @@ namespace
         SDL_Window *window = nullptr;
         SDL_Renderer *renderer = nullptr;
         SDL_Texture *texture = nullptr;
+        bool use_gl = false, use_gles2 = false;
+#ifdef DETONATE_HW
+        SDL_GLContext context = nullptr;
+        retro_hw_render_callback hw{};
+        gl_video gl{};
+        bool context_ready = false;
+        static uintptr_t RETRO_CALLCONV framebuffer() { return active->gl.framebuffer; }
+        static retro_proc_address_t RETRO_CALLCONV proc(const char *name)
+        { return reinterpret_cast<retro_proc_address_t>(SDL_GL_GetProcAddress(name)); }
+#endif
         SDL_AudioStream *audio = nullptr;
         retro_keyboard_callback keyboard{};
         retro_system_av_info av{};
@@ -65,6 +81,10 @@ namespace
 
         ~host()
         {
+#ifdef DETONATE_HW
+            if (context_ready && hw.context_destroy)
+                hw.context_destroy();
+#endif
             if (loaded)
                 core.retro_unload_game();
             if (initialized)
@@ -75,6 +95,13 @@ namespace
                 SDL_DestroyTexture(texture);
             if (renderer)
                 SDL_DestroyRenderer(renderer);
+#ifdef DETONATE_HW
+            if (context)
+            {
+                gl_video_destroy(&gl);
+                SDL_GL_DestroyContext(context);
+            }
+#endif
             if (window)
                 SDL_DestroyWindow(window);
             SDL_ShowCursor();
@@ -84,6 +111,29 @@ namespace
         {
             switch (command)
             {
+            case RETRO_ENVIRONMENT_SET_VARIABLES:
+                return true;
+            case RETRO_ENVIRONMENT_GET_VARIABLE:
+            {
+                auto *variable = static_cast<retro_variable *>(data);
+                if (std::string(variable->key) != "detonate_renderer")
+                    return false;
+                variable->value = active->use_gles2 ? "gles2" : active->use_gl ? "gl33" : "software";
+                return true;
+            }
+#ifdef DETONATE_HW
+            case RETRO_ENVIRONMENT_SET_HW_RENDER:
+            {
+                auto *request = static_cast<retro_hw_render_callback *>(data);
+                if (!active->context || (active->use_gles2 ? request->context_type != RETRO_HW_CONTEXT_OPENGLES2 :
+                    (request->context_type != RETRO_HW_CONTEXT_OPENGL_CORE || request->version_major != 3 || request->version_minor > 3)) || request->depth || request->stencil)
+                    return false;
+                request->get_current_framebuffer = framebuffer;
+                request->get_proc_address = proc;
+                active->hw = *request;
+                return true;
+            }
+#endif
             case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
                 return true;
             case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
@@ -103,6 +153,16 @@ namespace
             auto &s = *active;
             if (!pixels)
                 return;
+#ifdef DETONATE_HW
+            if (s.use_gl)
+            {
+                if (pixels != RETRO_HW_FRAME_BUFFER_VALID || w != s.gl.width || h != s.gl.height)
+                    s.failure = "Expected an OpenGL core frame. Enable the selected renderer in the core build.";
+                else
+                    ++s.video_frames;
+                return;
+            }
+#endif
             if (pixels == RETRO_HW_FRAME_BUFFER_VALID || w != s.av.geometry.base_width || h != s.av.geometry.base_height ||
                 pitch < size_t(w) * 4 || pitch > size_t(std::numeric_limits<int>::max()))
             {
@@ -147,11 +207,23 @@ namespace
                         keyboard.callback(false, key, 0, 0);
             keys.fill(false);
         }
+        bool coordinates(float x, float y, float *logical_x, float *logical_y)
+        {
+            if (!use_gl)
+                return SDL_RenderCoordinatesFromWindow(renderer, x, y, logical_x, logical_y);
+            int w, h;
+            if (!SDL_GetWindowSize(window, &w, &h) || w <= 0 || h <= 0)
+                return false;
+            const float scale = std::min(float(w) / av.geometry.base_width, float(h) / av.geometry.base_height);
+            *logical_x = (x - (w - av.geometry.base_width * scale) / 2) / scale;
+            *logical_y = (y - (h - av.geometry.base_height * scale) / 2) / scale;
+            return true;
+        }
         void sync_pointer()
         {
             float x, y, logical_x, logical_y;
             SDL_GetMouseState(&x, &y);
-            if (SDL_RenderCoordinatesFromWindow(renderer, x, y, &logical_x, &logical_y))
+            if (coordinates(x, y, &logical_x, &logical_y))
                 mouse.push(logical_x, logical_y);
         }
         void start(const std::string &library, bool hide)
@@ -171,15 +243,37 @@ namespace
                 !std::isfinite(av.timing.fps) || av.timing.fps < 1 || av.timing.fps > 240 ||
                 !std::isfinite(av.timing.sample_rate) || av.timing.sample_rate < 8000 || av.timing.sample_rate > 384000)
                 throw std::runtime_error("Unsupported core geometry or audio timing.");
+#ifdef DETONATE_HW
+            if (use_gl)
+            {
+                require(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, use_gles2 ? 2 : 3) &&
+                        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, use_gles2 ? 0 : 3) &&
+                        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, use_gles2 ? SDL_GL_CONTEXT_PROFILE_ES : SDL_GL_CONTEXT_PROFILE_CORE) &&
+                        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, use_gles2 ? 0 : SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG) &&
+                        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1), "Set graphics context attributes");
+            }
+#endif
             window = SDL_CreateWindow("Detonate", int(av.geometry.base_width), int(av.geometry.base_height),
-                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | (hidden ? SDL_WINDOW_HIDDEN : 0));
+                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | (use_gl ? SDL_WINDOW_OPENGL : 0) | (hidden ? SDL_WINDOW_HIDDEN : 0));
             require(window != nullptr, "Create window");
-            renderer = SDL_CreateRenderer(window, nullptr);
-            require(renderer != nullptr, "Create renderer");
-            require(SDL_SetRenderLogicalPresentation(renderer, int(av.geometry.base_width), int(av.geometry.base_height), SDL_LOGICAL_PRESENTATION_LETTERBOX), "Set logical resolution");
-            texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, int(av.geometry.base_width), int(av.geometry.base_height));
-            require(texture != nullptr, "Create video texture");
-            SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
+#ifdef DETONATE_HW
+            if (use_gl)
+            {
+                context = SDL_GL_CreateContext(window);
+                require(context != nullptr, "Create graphics context");
+                require(gl_video_create(&gl, proc, av.geometry.base_width, av.geometry.base_height, use_gles2), "Create OpenGL framebuffer");
+                SDL_GL_SetSwapInterval(0); // The host frame clock controls pacing.
+            }
+            else
+#endif
+            {
+                renderer = SDL_CreateRenderer(window, nullptr);
+                require(renderer != nullptr, "Create renderer");
+                require(SDL_SetRenderLogicalPresentation(renderer, int(av.geometry.base_width), int(av.geometry.base_height), SDL_LOGICAL_PRESENTATION_LETTERBOX), "Set logical resolution");
+                texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, int(av.geometry.base_width), int(av.geometry.base_height));
+                require(texture != nullptr, "Create video texture");
+                SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
+            }
             const SDL_AudioSpec spec{SDL_AUDIO_S16, 2, int(av.timing.sample_rate)};
             audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
             require(audio != nullptr, "Open audio device");
@@ -204,6 +298,15 @@ namespace
                 loaded = core.retro_load_game(nullptr); // Keep the browser available after a failed drop.
             if (!loaded)
                 throw std::runtime_error("Unable to initialize the Detonate browser.");
+#ifdef DETONATE_HW
+            if (use_gl && !context_ready)
+            {
+                if (!hw.context_reset)
+                    throw std::runtime_error("Core did not request OpenGL. Enable the selected renderer in the core build.");
+                hw.context_reset();
+                context_ready = true;
+            }
+#endif
             SDL_SetWindowTitle(window, path.empty() || !opened ? "Detonate" : ("Detonate - " + path).c_str());
             // Re-align the software cursor after the core resets it on load.
             sync_pointer();
@@ -248,7 +351,7 @@ namespace
                 {
                     const bool motion = event.type == SDL_EVENT_MOUSE_MOTION;
                     float x, y;
-                    if (!SDL_RenderCoordinatesFromWindow(renderer, motion ? event.motion.x : event.button.x, motion ? event.motion.y : event.button.y, &x, &y))
+                    if (!coordinates(motion ? event.motion.x : event.button.x, motion ? event.motion.y : event.button.y, &x, &y))
                         break;
                     int button = -1;
                     if (!motion)
@@ -310,6 +413,16 @@ namespace
             core.retro_run();
             if (!failure.empty())
                 throw std::runtime_error(failure);
+#ifdef DETONATE_HW
+            if (use_gl)
+            {
+                int w, h;
+                require(SDL_GetWindowSizeInPixels(window, &w, &h), "Get drawable size");
+                gl_video_present(&gl, w, h, hw.bottom_left_origin);
+                require(SDL_GL_SwapWindow(window), "Present OpenGL video");
+                return;
+            }
+#endif
             require(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255) && SDL_RenderClear(renderer) &&
                         SDL_RenderTexture(renderer, texture, nullptr, nullptr) && SDL_RenderPresent(renderer),
                     "Present video");
@@ -324,13 +437,13 @@ int main(int argc, char **argv)
     {
         std::string library, content;
         unsigned frame_limit = 0;
-        bool hidden = false;
+        bool hidden = false, use_gl = false, use_gles2 = false;
         for (int i = 1; i < argc; ++i)
         {
             const std::string arg = argv[i];
             if (arg == "--help" || arg == "-h")
             {
-                std::puts("Usage: detonate-sdl3 [--core PATH] [FILE]\nDrop a file to open it. F11: fullscreen. Ctrl+Q: quit.\n--frames N --hidden: bounded/headless smoke runs.");
+                std::puts("Usage: detonate-sdl3 [--core PATH] [--gl33 | --gles2] [FILE]\nDrop a file to open it. F11: fullscreen. Ctrl+Q: quit.\n--gl33: OpenGL 3.3 (-Dgl33=true). --gles2: OpenGL ES 2.0 (-Dgles2=true).\n--frames N --hidden: bounded/headless smoke runs.");
                 return 0;
             }
             if ((arg == "--core" || arg == "--frames") && i + 1 >= argc)
@@ -345,6 +458,24 @@ int main(int argc, char **argv)
                 if (used != value.size() || !count || count > 1000000)
                     throw std::runtime_error("Invalid frame count.");
                 frame_limit = unsigned(count);
+            }
+            else if (arg == "--gl33")
+            {
+#ifdef DETONATE_GL33
+                if (use_gl) throw std::runtime_error("Select only one graphics backend.");
+                use_gl = true;
+#else
+                throw std::runtime_error("OpenGL support was not built. Configure with -Dgl33=true.");
+#endif
+            }
+            else if (arg == "--gles2")
+            {
+#ifdef DETONATE_GLES2
+                if (use_gl) throw std::runtime_error("Select only one graphics backend.");
+                use_gl = use_gles2 = true;
+#else
+                throw std::runtime_error("GLES2 support was not built. Configure with -Dgles2=true.");
+#endif
             }
             else if (arg == "--hidden")
                 hidden = true;
@@ -370,6 +501,8 @@ int main(int argc, char **argv)
             library = std::string(base) + name;
         }
         host app;
+        app.use_gl = use_gl;
+        app.use_gles2 = use_gles2;
         app.start(library, hidden);
         if (!app.load(content))
             throw std::runtime_error("Unable to open: " + content);

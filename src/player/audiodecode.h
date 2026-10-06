@@ -92,3 +92,9 @@ auddecode *create_2sf();
 
 auddecode *create_futurecomposer();
 auddecode *create_ken();
+auddecode *create_openmpt();
+auddecode *create_atari();
+
+auddecode *create_adlib();
+auddecode *create_pretracker();
+auddecode *create_uade();

@@ -81,6 +81,11 @@ const visualization_data &audio_visualizer::snapshot()
             power[i] += std::norm(bins[i]) * 0.5f;
     }
     const float last_bin = 20000.0f * fft_size / 44100.0f;
+    const auto normalized = [&](float power) {
+        const float amplitude = std::sqrt(power) * (4.0f / fft_size);
+        return std::clamp((20.0f * std::log10(std::max(amplitude, 0.001f)) + 60.0f) / 60.0f, 0.0f, 1.0f);
+    };
+    for (size_t bin = 0; bin < data_.fft.size(); ++bin) data_.fft[bin] = normalized(power[bin]);
     for (size_t band = 0; band < data_.band_count; ++band)
     {
         const size_t first = size_t(std::ceil(std::pow(last_bin, float(band) / data_.band_count)));
@@ -88,8 +93,7 @@ const visualization_data &audio_visualizer::snapshot()
         float peak = 0;
         for (size_t bin = first; bin < std::max(first + 1, end) && bin < power.size(); ++bin)
             peak = std::max(peak, power[bin]);
-        const float amplitude = std::sqrt(peak) * (4.0f / fft_size); // Hann coherent gain
-        data_.spectrum[band] = std::clamp((20.0f * std::log10(std::max(amplitude, 0.001f)) + 60.0f) / 60.0f, 0.0f, 1.0f);
+        data_.spectrum[band] = normalized(peak);
     }
     return data_;
 }

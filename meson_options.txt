@@ -1,1 +1,3 @@
 option('standalone', type: 'feature', value: 'auto', description: 'Build the standalone core loader (native GDI/WinMM on Windows, SDL3 elsewhere)')
+option('gl33', type: 'boolean', value: false, description: 'Include the optional OpenGL 3.3 renderer and standalone context support')
+option('gles2', type: 'boolean', value: false, description: 'Include the optional OpenGL ES 2.0 renderer and standalone context support (EGL on Windows)')

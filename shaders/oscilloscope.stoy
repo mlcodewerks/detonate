@@ -1,0 +1,18 @@
+stoy 1
+[pass image]
+shader:
+void mainImage(out vec4 color, in vec2 fragCoord)
+{
+    vec2 uv = fragCoord / iResolution.xy;
+    vec2 wave = texture(iWaveform, vec2(uv.x, 0.5)).rg * 2.0 - 1.0;
+    vec2 lineY = vec2(0.72, 0.28) + 0.2 * wave;
+    float thickness = 1.5 / iResolution.y;
+    vec2 d = abs(vec2(uv.y) - lineY);
+    vec2 trace = vec2(1.0) - smoothstep(vec2(thickness), vec2(thickness * 2.5), d);
+    vec2 glow = exp(-d * 100.0) * 0.25;
+    float grid = max(step(0.985, fract(uv.x * 16.0)), step(0.97, fract(uv.y * 8.0)));
+    vec3 bg = vec3(0.02, 0.03, 0.045) + grid * vec3(0.035);
+    color = vec4(bg + (trace.x + glow.x) * vec3(0.2, 1.0, 0.75)
+                    + (trace.y + glow.y) * vec3(0.35, 0.6, 1.0), 1.0);
+}
+[end]

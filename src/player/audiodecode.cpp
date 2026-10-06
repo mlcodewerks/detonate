@@ -2,6 +2,7 @@
 #include "visualization.h"
 #include "archive_reader.h"
 #include "libretro.h"
+#include "replays/UADE/extensions.h"
 #include <audio/audio_resampler.h>
 #include <algorithm>
 #include <array>
@@ -23,7 +24,7 @@ namespace
 {
     constexpr unsigned output_rate = 44100, tick_frames = output_rate / 60;
     using factory = auddecode *(*)();
-    constexpr factory factories[] = {create_common, create_wav, create_mpc, create_wv, create_vgm, create_gme, create_sid, create_v2m, create_organya, create_klystrack, create_futurecomposer, create_ken, create_tfmx, create_hively, create_psx, create_sega, create_qsf, create_usf, create_gsf, create_snsf, create_2sf};
+    constexpr factory factories[] = {create_common, create_openmpt, create_atari, create_wav, create_mpc, create_wv, create_vgm, create_gme, create_sid, create_v2m, create_organya, create_klystrack, create_futurecomposer, create_ken, create_adlib, create_pretracker, create_tfmx, create_hively, create_psx, create_sega, create_qsf, create_usf, create_gsf, create_snsf, create_2sf, create_uade};
     struct temporary_audio
     {
         std::filesystem::path directory, audio;
@@ -45,6 +46,13 @@ namespace
         for (const auto *prefix : {"mdat", "fc", "fc13", "fc14", "fc3", "fc4", "smod", "hip", "hip7", "hipc", "mcmd", "dns"})
             if (lowerbase.starts_with(std::string(prefix) + "."))
                 return prefix;
+
+        static const auto amiga_prefixes = uade_extensions();
+        auto dot = lowerbase.find('.');
+        if (dot != std::string::npos) {
+            auto prefix = lowerbase.substr(0, dot);
+            if (std::find(amiga_prefixes.begin(), amiga_prefixes.end(), prefix) != amiga_prefixes.end()) return prefix;
+        }
 
         std::string ext = std::filesystem::path(reinterpret_cast<const char8_t *>(filename)).extension().string();
         if (!ext.empty())
@@ -548,7 +556,7 @@ std::vector<subsong_tags> music_subsongs(const std::string &name,
     if (ext == "spc" || ext == "gym" || ext == "rsn")
         return {};
     bool supported = false;
-    for (auto create : {create_gme, create_sid, create_tfmx, create_hively, create_futurecomposer})
+    for (auto create : {create_gme, create_sid, create_tfmx, create_hively, create_futurecomposer, create_openmpt, create_atari})
     {
         std::unique_ptr<auddecode> candidate(create());
         const auto types = candidate->file_types();

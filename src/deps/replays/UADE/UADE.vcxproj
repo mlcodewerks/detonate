@@ -1,0 +1,686 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{72F0E934-A165-4E5C-AAAA-06B931449E5B}</ProjectGuid>
+    <RootNamespace>UADE</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)..\.output\$(Platform)_$(Configuration)\replays\</OutDir>
+    <IntDir>$(SolutionDir)..\.output\$(Platform)_$(Configuration)\Replay_$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)..\.output\$(Platform)_$(Configuration)\replays-win32\</OutDir>
+    <IntDir>$(SolutionDir)..\.output\$(Platform)_$(Configuration)\Replay_$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)..\.output\$(Platform)_$(Configuration)\replays\</OutDir>
+    <IntDir>$(SolutionDir)..\.output\$(Platform)_$(Configuration)\Replay_$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)..\.output\$(Platform)_$(Configuration)\replays-win32\</OutDir>
+    <IntDir>$(SolutionDir)..\.output\$(Platform)_$(Configuration)\Replay_$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>_WINDOWS;_USRDLL;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_DECLARE_NONSTDC_NAMES;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)Core;$(SolutionDir)Replays;$(ProjectDir)uade\src;$(ProjectDir)uade\src\include;$(ProjectDir)uade\src\frontends\common;$(ProjectDir)uade\src\frontends\include;$(ProjectDir)bencode\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>/wd4201 /wd4706 %(AdditionalOptions)</AdditionalOptions>
+      <ObjectFileName>$(IntDir)%(RelativeDir)\</ObjectFileName>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>Core.lib;Replay.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir)..\</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>_WINDOWS;_USRDLL;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_DECLARE_NONSTDC_NAMES;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)Core;$(SolutionDir)Replays;$(ProjectDir)uade\src;$(ProjectDir)uade\src\include;$(ProjectDir)uade\src\frontends\common;$(ProjectDir)uade\src\frontends\include;$(ProjectDir)bencode\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>/wd4201 /wd4706 %(AdditionalOptions)</AdditionalOptions>
+      <ObjectFileName>$(IntDir)%(RelativeDir)\</ObjectFileName>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>Core.lib;Replay.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir)..\</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_WINDOWS;_USRDLL;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_DECLARE_NONSTDC_NAMES;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)Core;$(SolutionDir)Replays;$(ProjectDir)uade\src;$(ProjectDir)uade\src\include;$(ProjectDir)uade\src\frontends\common;$(ProjectDir)uade\src\frontends\include;$(ProjectDir)bencode\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>/wd4201 /wd4706 %(AdditionalOptions)</AdditionalOptions>
+      <ObjectFileName>$(IntDir)%(RelativeDir)\</ObjectFileName>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>Core.lib;Replay.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir)..\</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>mkdir $(SolutionDir)..\data\replays &gt; nul 2&gt;&amp;1
+copy /Y $(TargetPath) $(SolutionDir)..\data\replays\$(TargetFileName) &gt; nul 2&gt;&amp;1
+mkdir $(SolutionDir)..\data\replays\UADE &gt; nul 2&gt;&amp;1
+rmdir /S /Q $(SolutionDir)..\data\replays\UADE\*.* &gt; nul 2&gt;&amp;1
+xcopy /Y /R /E $(ProjectDir)data $(SolutionDir)..\data\replays\UADE &gt; nul 2&gt;&amp;1</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_WINDOWS;_USRDLL;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_DECLARE_NONSTDC_NAMES;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)Core;$(SolutionDir)Replays;$(ProjectDir)uade\src;$(ProjectDir)uade\src\include;$(ProjectDir)uade\src\frontends\common;$(ProjectDir)uade\src\frontends\include;$(ProjectDir)bencode\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>/wd4201 /wd4706 %(AdditionalOptions)</AdditionalOptions>
+      <ObjectFileName>$(IntDir)%(RelativeDir)\</ObjectFileName>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>Core.lib;Replay.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir)..\</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>mkdir $(SolutionDir)..\data\replays-win32 &gt; nul 2&gt;&amp;1
+copy /Y $(TargetPath) $(SolutionDir)..\data\replays-win32\$(TargetFileName) &gt; nul 2&gt;&amp;1
+mkdir $(SolutionDir)..\data\replays-win32\UADE &gt; nul 2&gt;&amp;1
+rmdir /S /Q $(SolutionDir)..\data\replays-win32\UADE\*.* &gt; nul 2&gt;&amp;1
+xcopy /Y /R /E $(ProjectDir)data $(SolutionDir)..\data\replays-win32\UADE &gt; nul 2&gt;&amp;1</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="bencode\include\bencodetools\bencode.h" />
+    <ClInclude Include="compat\memmemrep.h" />
+    <ClInclude Include="compat\strlrep.h" />
+    <ClInclude Include="ReplayUADE.h" />
+    <ClInclude Include="ReplayUADE.inl.h" />
+    <ClInclude Include="uade\src\cputbl.h" />
+    <ClInclude Include="uade\src\frontends\common\fifo.h" />
+    <ClInclude Include="uade\src\frontends\common\md5.h" />
+    <ClInclude Include="uade\src\frontends\common\support.h" />
+    <ClInclude Include="uade\src\frontends\common\unixwalkdir.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\amifilemagic.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\amigafilter.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\compilersupport.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\eagleplayer.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\effects.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\options.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\ossupport.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\rmc.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\songdb.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\sysincludes.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\uade.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\uadeconf.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\uadeconfstructure.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\uadeconstants.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\uadecontrol.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\uadeipc.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\uadestate.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\uadeutils.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\unixatomic.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\unixsupport.h" />
+    <ClInclude Include="uade\src\frontends\include\uade\vparray.h" />
+    <ClInclude Include="uade\src\include\amigamsg.h" />
+    <ClInclude Include="uade\src\include\audio.h" />
+    <ClInclude Include="uade\src\include\cia.h" />
+    <ClInclude Include="uade\src\include\commpipe.h" />
+    <ClInclude Include="uade\src\include\compiler.h" />
+    <ClInclude Include="uade\src\include\custom.h" />
+    <ClInclude Include="uade\src\include\debug.h" />
+    <ClInclude Include="uade\src\include\events.h" />
+    <ClInclude Include="uade\src\include\execlib.h" />
+    <ClInclude Include="uade\src\include\gensound.h" />
+    <ClInclude Include="uade\src\include\memory.h" />
+    <ClInclude Include="uade\src\include\newcpu.h" />
+    <ClInclude Include="uade\src\include\options.h" />
+    <ClInclude Include="uade\src\include\osemu.h" />
+    <ClInclude Include="uade\src\include\readcpu.h" />
+    <ClInclude Include="uade\src\include\sinctable.h" />
+    <ClInclude Include="uade\src\include\state_detection.h" />
+    <ClInclude Include="uade\src\include\sysdeps.h" />
+    <ClInclude Include="uade\src\include\text_scope.h" />
+    <ClInclude Include="uade\src\include\uadectl.h" />
+    <ClInclude Include="uade\src\include\uade_logging.h" />
+    <ClInclude Include="uade\src\include\uae.h" />
+    <ClInclude Include="uade\src\include\write_audio.h" />
+    <ClInclude Include="uade\src\include\write_audio_ext.h" />
+    <ClInclude Include="uade\src\machdep\m68k.h" />
+    <ClInclude Include="uade\src\machdep\maccess.h" />
+    <ClInclude Include="uade\src\sd-sound-generic.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="uade\src\sd-sound.h" />
+    <ClInclude Include="uade\src\sysconfig.h" />
+    <ClInclude Include="uade\src\target.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="bencode\bencode.c" />
+    <ClCompile Include="compat\memmemrep.c" />
+    <ClCompile Include="compat\memmemtest.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="compat\strlrep.c" />
+    <ClCompile Include="compat\unlikelytest.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="ReplayUADE.cpp" />
+    <ClCompile Include="ReplayUADEWrapper.cpp" />
+    <ClCompile Include="uade\src\audio.c" />
+    <ClCompile Include="uade\src\build68k.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\cfgfile.c" />
+    <ClCompile Include="uade\src\cia.c" />
+    <ClCompile Include="uade\src\compiler.c" />
+    <ClCompile Include="uade\src\cpudefs.c" />
+    <ClCompile Include="uade\src\cpuemu.c" />
+    <ClCompile Include="uade\src\cpustbl.c" />
+    <ClCompile Include="uade\src\custom.c" />
+    <ClCompile Include="uade\src\debug.c" />
+    <ClCompile Include="uade\src\fpp.c" />
+    <ClCompile Include="uade\src\frontends\common\amifilemagic.c" />
+    <ClCompile Include="uade\src\frontends\common\eagleplayer.c" />
+    <ClCompile Include="uade\src\frontends\common\effects.c" />
+    <ClCompile Include="uade\src\frontends\common\fifo.c" />
+    <ClCompile Include="uade\src\frontends\common\md5.c" />
+    <ClCompile Include="uade\src\frontends\common\rmc.c" />
+    <ClCompile Include="uade\src\frontends\common\songdb.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\frontends\common\songinfo.c" />
+    <ClCompile Include="uade\src\frontends\common\support.c" />
+    <ClCompile Include="uade\src\frontends\common\uadeconf.c" />
+    <ClCompile Include="uade\src\frontends\common\uadecontrol.c" />
+    <ClCompile Include="uade\src\frontends\common\uadeipc.c" />
+    <ClCompile Include="uade\src\frontends\common\uadestate.c" />
+    <ClCompile Include="uade\src\frontends\common\uadeutils.c" />
+    <ClCompile Include="uade\src\frontends\common\unixatomic.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\frontends\common\unixsupport.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\frontends\common\unixwalkdir.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\frontends\common\vparray.c" />
+    <ClCompile Include="uade\src\gencpu.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\machdep\support.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\main.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\md-support.c" />
+    <ClCompile Include="uade\src\memory.c" />
+    <ClCompile Include="uade\src\missing.c" />
+    <ClCompile Include="uade\src\newcpu.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\readcpu.c" />
+    <ClCompile Include="uade\src\sd-sound-generic.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\sd-sound.c" />
+    <ClCompile Include="uade\src\sinctable.c" />
+    <ClCompile Include="uade\src\state_detection.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\text_scope.c" />
+    <ClCompile Include="uade\src\uade.c" />
+    <ClCompile Include="uade\src\uademain.c" />
+    <ClCompile Include="uade\src\uade_logging.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="uade\src\write_audio.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="data\eagleplayer.conf" />
+    <None Include="data\score" />
+    <None Include="data\extras\hippel_st.smp.set" />
+    <None Include="data\extras\Samples\ackerbell" />
+    <None Include="data\extras\Samples\analogstring" />
+    <None Include="data\extras\Samples\awcpiano1" />
+    <None Include="data\extras\Samples\backingstr" />
+    <None Include="data\extras\Samples\bass2" />
+    <None Include="data\extras\Samples\bass6" />
+    <None Include="data\extras\Samples\bassdrum 5160" />
+    <None Include="data\extras\Samples\bigbang.smp" />
+    <None Include="data\extras\Samples\blow" />
+    <None Include="data\extras\Samples\bongo1 2206" />
+    <None Include="data\extras\Samples\claps1" />
+    <None Include="data\extras\Samples\detune" />
+    <None Include="data\extras\Samples\digdug" />
+    <None Include="data\extras\Samples\dxtom" />
+    <None Include="data\extras\Samples\electom" />
+    <None Include="data\extras\Samples\funbass" />
+    <None Include="data\extras\Samples\guitar2" />
+    <None Include="data\extras\Samples\hae.smp" />
+    <None Include="data\extras\Samples\hallbrass" />
+    <None Include="data\extras\Samples\heavysynth" />
+    <None Include="data\extras\Samples\heavytom.smp" />
+    <None Include="data\extras\Samples\highhat2" />
+    <None Include="data\extras\Samples\highhat2 2006" />
+    <None Include="data\extras\Samples\highop2" />
+    <None Include="data\extras\Samples\hihat1" />
+    <None Include="data\extras\Samples\hihat2" />
+    <None Include="data\extras\Samples\hooman" />
+    <None Include="data\extras\Samples\korgbass" />
+    <None Include="data\extras\Samples\koto" />
+    <None Include="data\extras\Samples\metalbell" />
+    <None Include="data\extras\Samples\metalkeys" />
+    <None Include="data\extras\Samples\panflute" />
+    <None Include="data\extras\Samples\perco" />
+    <None Include="data\extras\Samples\pingbells" />
+    <None Include="data\extras\Samples\pizza" />
+    <None Include="data\extras\Samples\plunkbass" />
+    <None Include="data\extras\Samples\plunkbass2" />
+    <None Include="data\extras\Samples\popbass" />
+    <None Include="data\extras\Samples\shaker" />
+    <None Include="data\extras\Samples\shamus" />
+    <None Include="data\extras\Samples\sinecz" />
+    <None Include="data\extras\Samples\snare3" />
+    <None Include="data\extras\Samples\snare4" />
+    <None Include="data\extras\Samples\snarehard.smp" />
+    <None Include="data\extras\Samples\strings.ss" />
+    <None Include="data\extras\Samples\strings6" />
+    <None Include="data\extras\Samples\thguitar" />
+    <None Include="data\extras\Samples\tom1" />
+    <None Include="data\extras\Samples\tom2" />
+    <None Include="data\extras\Samples\tom4" />
+    <None Include="data\extras\Samples\woodblock" />
+    <None Include="data\extras\ym.aenigmatica_replay" />
+    <None Include="data\extras\ym.alteredbeast_replay" />
+    <None Include="data\extras\ym.amberstar_replay" />
+    <None Include="data\extras\ym.armalyte_replay" />
+    <None Include="data\extras\ym.big_replay" />
+    <None Include="data\extras\ym.blipblop_replay" />
+    <None Include="data\extras\ym.chipmon2_replay" />
+    <None Include="data\extras\ym.coso mmme_replay" />
+    <None Include="data\extras\ym.coso tfmx old_replay" />
+    <None Include="data\extras\ym.coso tfmx replay" />
+    <None Include="data\extras\ym.crapman1_replay" />
+    <None Include="data\extras\ym.crapman2_replay" />
+    <None Include="data\extras\ym.dyter07_replay" />
+    <None Include="data\extras\ym.fireice_replay" />
+    <None Include="data\extras\ym.gemx_replay" />
+    <None Include="data\extras\ym.ghostbattle_replay" />
+    <None Include="data\extras\ym.harlequin_replay" />
+    <None Include="data\extras\ym.huntforredoct_replay" />
+    <None Include="data\extras\ym.jimpower_replay" />
+    <None Include="data\extras\ym.lastninjaiii_replay" />
+    <None Include="data\extras\ym.lcd_replay" />
+    <None Include="data\extras\ym.mcoder_replay" />
+    <None Include="data\extras\ym.metrocross_replay" />
+    <None Include="data\extras\ym.mmme sid_replay" />
+    <None Include="data\extras\ym.ninjaremix_replay" />
+    <None Include="data\extras\ym.nobuddiesland_replay" />
+    <None Include="data\extras\ym.page_replay" />
+    <None Include="data\extras\ym.periodin3d_replay" />
+    <None Include="data\extras\ym.pshields_replay" />
+    <None Include="data\extras\ym.realms_replay" />
+    <None Include="data\extras\ym.rollingronny_replay" />
+    <None Include="data\extras\ym.shadowdancer_replay" />
+    <None Include="data\extras\ym.sidsound_replay" />
+    <None Include="data\extras\ym.spacecrusade_replay" />
+    <None Include="data\extras\ym.spacegun_replay" />
+    <None Include="data\extras\ym.stos_replay" />
+    <None Include="data\extras\ym.synthiv_replay" />
+    <None Include="data\extras\ym.taodigi_replay" />
+    <None Include="data\extras\ym.taohubbard_replay" />
+    <None Include="data\extras\ym.taoms211_replay" />
+    <None Include="data\extras\ym.tfmx_replay" />
+    <None Include="data\extras\ym.thalion_replay" />
+    <None Include="data\extras\ym.tsdpart1_replay" />
+    <None Include="data\extras\ym.tsdpart2_replay" />
+    <None Include="data\extras\ym.tsdpart4_replay" />
+    <None Include="data\extras\ym.union cuddly_replay" />
+    <None Include="data\extras\ym.utopia_replay" />
+    <None Include="data\extras\ym.vikingchild_replay" />
+    <None Include="data\extras\ym.xbiossound_replay" />
+    <None Include="data\extras\ym.zonewarrior_replay" />
+    <None Include="data\extras\ym.zout_replay" />
+    <None Include="data\players\AbyssHighestExperience" />
+    <None Include="data\players\ActionAmics" />
+    <None Include="data\players\ADPCM_mono" />
+    <None Include="data\players\Alcatraz_Packer" />
+    <None Include="data\players\AM-Composer" />
+    <None Include="data\players\AMOS" />
+    <None Include="data\players\Anders_0land" />
+    <None Include="data\players\Andrew_Parton" />
+    <None Include="data\players\AProSys" />
+    <None Include="data\players\ArtAndMagic" />
+    <None Include="data\players\ArtOfNoise-4V" />
+    <None Include="data\players\ArtOfNoise-8V" />
+    <None Include="data\players\Ashley_Hogg" />
+    <None Include="data\players\AudioSculpture" />
+    <None Include="data\players\BeathovenSynthesizer" />
+    <None Include="data\players\BenDaglish" />
+    <None Include="data\players\BenDaglish-SID" />
+    <None Include="data\players\BladePacker" />
+    <None Include="data\players\ChipTracker" />
+    <None Include="data\players\Cinemaware" />
+    <None Include="data\players\CoreDesign" />
+    <None Include="data\players\CustomMade" />
+    <None Include="data\players\DariusZendeh" />
+    <None Include="data\players\DaveLowe" />
+    <None Include="data\players\DaveLoweNew" />
+    <None Include="data\players\DaveLowe_Deli" />
+    <None Include="data\players\DavidHanney" />
+    <None Include="data\players\DavidWhittaker" />
+    <None Include="data\players\DeltaMusic1.3" />
+    <None Include="data\players\DeltaMusic2.0" />
+    <None Include="data\players\Desire" />
+    <None Include="data\players\DIGI-Booster" />
+    <None Include="data\players\DigitalSonixChrome" />
+    <None Include="data\players\DigitalSoundStudio" />
+    <None Include="data\players\DirkBialluch" />
+    <None Include="data\players\DynamicSynthesizer" />
+    <None Include="data\players\EarAche" />
+    <None Include="data\players\EMS" />
+    <None Include="data\players\EMS-6" />
+    <None Include="data\players\ENV\EaglePlayer\ahx" />
+    <None Include="data\players\ENV\EaglePlayer\ahx.waves" />
+    <None Include="data\players\ENV\EaglePlayer\ems_v6.cfg" />
+    <None Include="data\players\ENV\EaglePlayer\EP-Hippel_7V.cfg" />
+    <None Include="data\players\ENV\EaglePlayer\EP-Mugician_II.cfg" />
+    <None Include="data\players\ENV\EaglePlayer\EP-PTK-Prowiz.cfg" />
+    <None Include="data\players\ENV\EaglePlayer\EP-S3M.cfg" />
+    <None Include="data\players\ENV\EaglePlayer\EP-TFMX_7V.cfg" />
+    <None Include="data\players\ENV\EaglePlayer\EP-TFMX_Pro.cfg" />
+    <None Include="data\players\FashionTracker" />
+    <None Include="data\players\ForgottenWorlds_Game" />
+    <None Include="data\players\Fred" />
+    <None Include="data\players\FredGray" />
+    <None Include="data\players\FutureComposer-BSI" />
+    <None Include="data\players\FutureComposer1.3" />
+    <None Include="data\players\FutureComposer1.4" />
+    <None Include="data\players\FuturePlayer" />
+    <None Include="data\players\GlueMon" />
+    <None Include="data\players\GMC" />
+    <None Include="data\players\HowieDavies" />
+    <None Include="data\players\ImagesMusicSystem" />
+    <None Include="data\players\Infogrames" />
+    <None Include="data\players\InStereo" />
+    <None Include="data\players\InStereo2.0" />
+    <None Include="data\players\JamCracker" />
+    <None Include="data\players\JankoMrsicFlogel" />
+    <None Include="data\players\Janne_Salmijarvi_Optimizer" />
+    <None Include="data\players\JasonBrooke" />
+    <None Include="data\players\JasonPage" />
+    <None Include="data\players\JeroenTel" />
+    <None Include="data\players\JesperOlsen" />
+    <None Include="data\players\JesperOlsen_EP" />
+    <None Include="data\players\JochenHippel" />
+    <None Include="data\players\JochenHippel-7V" />
+    <None Include="data\players\JochenHippel-CoSo" />
+    <None Include="data\players\JochenHippel_UADE" />
+    <None Include="data\players\Jochen_Hippel_ST" />
+    <None Include="data\players\Kim_Christensen" />
+    <None Include="data\players\KrisHatlelid" />
+    <None Include="data\players\Laxity" />
+    <None Include="data\players\LegglessMusicEditor" />
+    <None Include="data\players\MagneticFieldsPacker" />
+    <None Include="data\players\MajorTom" />
+    <None Include="data\players\ManiacsOfNoise" />
+    <None Include="data\players\MarkII" />
+    <None Include="data\players\Mark_Cooksey" />
+    <None Include="data\players\Mark_Cooksey_Old" />
+    <None Include="data\players\MartinWalker" />
+    <None Include="data\players\Maximum_Effect" />
+    <None Include="data\players\MCMD" />
+    <None Include="data\players\MED" />
+    <None Include="data\players\Medley" />
+    <None Include="data\players\MIDI-Loriciel" />
+    <None Include="data\players\MikeDavies" />
+    <None Include="data\players\MMDC" />
+    <None Include="data\players\Mosh_Packer" />
+    <None Include="data\players\Mugician" />
+    <None Include="data\players\MugicianII" />
+    <None Include="data\players\MultiMedia_Sound" />
+    <None Include="data\players\MusicAssembler" />
+    <None Include="data\players\MusiclineEditor" />
+    <None Include="data\players\MusicMaker-4V" />
+    <None Include="data\players\MusicMaker-8V" />
+    <None Include="data\players\Nick_Pelling_Packer" />
+    <None Include="data\players\NovoTradePacker" />
+    <None Include="data\players\NTSP-system" />
+    <None Include="data\players\Octa-MED" />
+    <None Include="data\players\Oktalyzer" />
+    <None Include="data\players\onEscapee" />
+    <None Include="data\players\PaulRobotham" />
+    <None Include="data\players\PaulShields" />
+    <None Include="data\players\PaulSummers" />
+    <None Include="data\players\Paul_Tonge" />
+    <None Include="data\players\PeterVerswyvelen" />
+    <None Include="data\players\PierreAdane" />
+    <None Include="data\players\Pokeynoise" />
+    <None Include="data\players\PreTracker" />
+    <None Include="data\players\ProfessionalSoundArtists" />
+    <None Include="data\players\Protracker4" />
+    <None Include="data\players\PTK-Prowiz" />
+    <None Include="data\players\PumaTracker" />
+    <None Include="data\players\QuadraComposer" />
+    <None Include="data\players\Quartet" />
+    <None Include="data\players\Quartet_PSG" />
+    <None Include="data\players\Quartet_ST" />
+    <None Include="data\players\RichardJoseph" />
+    <None Include="data\players\RichardJoseph_Player" />
+    <None Include="data\players\RiffRaff" />
+    <None Include="data\players\RobHubbard" />
+    <None Include="data\players\RobHubbard_ST" />
+    <None Include="data\players\ScottJohnston" />
+    <None Include="data\players\SCUMM" />
+    <None Include="data\players\SeanConnolly" />
+    <None Include="data\players\SeanConran" />
+    <None Include="data\players\SIDMon1.0" />
+    <None Include="data\players\SIDMon2.0" />
+    <None Include="data\players\Sierra-AGI" />
+    <None Include="data\players\Silmarils" />
+    <None Include="data\players\SonicArranger" />
+    <None Include="data\players\SonicArranger-pc-all" />
+    <None Include="data\players\SonixMusicDriver" />
+    <None Include="data\players\Sound-FX" />
+    <None Include="data\players\SoundControl" />
+    <None Include="data\players\SoundFactory" />
+    <None Include="data\players\SoundImages" />
+    <None Include="data\players\SoundMaster" />
+    <None Include="data\players\SoundMon2.0" />
+    <None Include="data\players\SoundMon2.2" />
+    <None Include="data\players\SoundPlayer" />
+    <None Include="data\players\SoundProgrammingLanguage" />
+    <None Include="data\players\Soundtracker-IV" />
+    <None Include="data\players\Special-FX" />
+    <None Include="data\players\Special-FX_ST" />
+    <None Include="data\players\SpeedyA1System" />
+    <None Include="data\players\SpeedySystem" />
+    <None Include="data\players\SteveBarrett" />
+    <None Include="data\players\SteveTurner" />
+    <None Include="data\players\SUN-Tronic" />
+    <None Include="data\players\Synth" />
+    <None Include="data\players\SynthDream" />
+    <None Include="data\players\SynthPack" />
+    <None Include="data\players\SynTracker" />
+    <None Include="data\players\S\dummy_file" />
+    <None Include="data\players\TCB_Tracker" />
+    <None Include="data\players\TFMX" />
+    <None Include="data\players\TFMX-7V" />
+    <None Include="data\players\TFMX-7V-TFHD" />
+    <None Include="data\players\TFMX-Pro" />
+    <None Include="data\players\TFMX-Pro-TFHD" />
+    <None Include="data\players\TFMX-TFHD" />
+    <None Include="data\players\TFMX_ST" />
+    <None Include="data\players\TheMusicalEnlightenment" />
+    <None Include="data\players\ThomasHermann" />
+    <None Include="data\players\TimeTracker" />
+    <None Include="data\players\TimFollin" />
+    <None Include="data\players\Titanics_Packer" />
+    <None Include="data\players\TomyTracker" />
+    <None Include="data\players\Tronic" />
+    <None Include="data\players\UFO" />
+    <None Include="data\players\UltimateSoundtracker" />
+    <None Include="data\players\VoodooSupremeSynthesizer" />
+    <None Include="data\players\WallyBeben" />
+    <None Include="data\players\YM-2149" />
+    <None Include="data\players\ZoundMonitor" />
+    <None Include="data\uaerc" />
+    <None Include="uade\src\table68k" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="data\players\ENV\EaglePlayer\ems_v6.cfg.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

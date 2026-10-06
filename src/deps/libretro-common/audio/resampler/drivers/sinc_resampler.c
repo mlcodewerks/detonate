@@ -38,6 +38,9 @@
 #include <memalign.h>
 
 #include <audio/audio_resampler.h>
+#include "sinc_resampler_internal.h"
+
+#include <audio/sinc_resampler.h>
 
 #ifdef __SSE__
 #include <xmmintrin.h>
@@ -822,9 +825,9 @@ static void sinc_init_table_lanczos(
    }
 }
 
-static void *resampler_sinc_new(const struct resampler_config *config,
-      double bandwidth_mod, enum resampler_quality quality,
-      resampler_simd_mask_t mask)
+void *sinc_resampler_init_hq(double bandwidth_mod,
+      enum resampler_quality quality, resampler_simd_mask_t mask,
+      int hq_oversampling)
 {
    double cutoff                  = 0.0;
    size_t phase_elems             = 0;
@@ -882,6 +885,21 @@ static void *resampler_sinc_new(const struct resampler_config *config,
          re->kaiser_beta   = 5.5;
          break;
    }
+
+   if (hq_oversampling && bandwidth_mod >= 2.0)
+   {
+      cutoff            = SINC_HQ_CUTOFF;
+      sidelobes         = SINC_HQ_SIDELOBES;
+      re->phase_bits    = SINC_HQ_PHASE_BITS;
+      re->subphase_bits = SINC_HQ_SUBPHASE_BITS;
+      window_type       = SINC_WINDOW_KAISER;
+      re->kaiser_beta   = SINC_HQ_KAISER_BETA;
+      enable_avx        = 1;
+   }
+
+   if (!sinc_resampler_ratio_valid(bandwidth_mod,
+            re->phase_bits, re->subphase_bits))
+      goto error;
 
    re->subphase_mask = (1 << re->subphase_bits) - 1;
    re->subphase_mod  = 1.0f / (1 << re->subphase_bits);
@@ -978,12 +996,32 @@ error:
    return NULL;
 }
 
+static void *resampler_sinc_new(const struct resampler_config *config,
+      double bandwidth_mod, enum resampler_quality quality,
+      resampler_simd_mask_t mask)
+{
+   (void)config;
+   return sinc_resampler_init_hq(bandwidth_mod, quality, mask, 0);
+}
+
 /* Thin dispatcher: the vtable is shared across all live instances, so the
  * actual kernel is read from the instance itself.  One indirect call per
  * process() invocation (per chunk, not per sample) - no measurable cost. */
 static void resampler_sinc_process(void *re_, struct resampler_data *data)
 {
-   ((rarch_sinc_resampler_t*)re_)->process(re_, data);
+   rarch_sinc_resampler_t *re = (rarch_sinc_resampler_t*)re_;
+   /* init refuses a nominal ratio the phase clock cannot advance on.
+    * The ratio each call carries is a different number - rate control
+    * and slow motion move it - and phases / data->ratio is taken from
+    * it, so an unusable one leaves a zero step and a loop that emits
+    * past data_out. */
+   if (!sinc_resampler_ratio_valid(data->ratio,
+            re->phase_bits, re->subphase_bits))
+   {
+      data->output_frames = 0;
+      return;
+   }
+   re->process(re_, data);
 }
 
 retro_resampler_t sinc_resampler = {
@@ -993,7 +1031,8 @@ retro_resampler_t sinc_resampler = {
    RESAMPLER_API_VERSION,
    "sinc",
    "sinc",
-   resampler_sinc_reset
+   resampler_sinc_reset,
+   RESAMPLER_CAP_QUALITY | RESAMPLER_CAP_HQ_OVERSAMPLE
 };
 
 #if defined(__GNUC__) && defined(__OPTIMIZE__) && !defined(__clang__)

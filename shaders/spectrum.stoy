@@ -1,0 +1,16 @@
+stoy 1
+[pass image]
+shader:
+void mainImage(out vec4 color, in vec2 fragCoord)
+{
+    vec2 uv = fragCoord / iResolution.xy;
+    float hz = exp(mix(log(40.0), log(20000.0), uv.x));
+    float energy = texture(iFFT, vec2(hz / (iSampleRate * 0.5), 0.5)).r;
+    float height = 0.08 + 0.78 * energy;
+    float line = 1.0 - smoothstep(0.0, 3.0 / iResolution.y, abs(uv.y - height));
+    float fill = (1.0 - smoothstep(height, height + 0.01, uv.y)) * energy;
+    vec3 tint = mix(vec3(0.15, 0.9, 0.75), vec3(0.4, 0.45, 1.0), uv.x);
+    vec3 bg = vec3(0.025, 0.04, 0.075) + vec3(0.025) * step(0.97, fract(uv.y * 10.0));
+    color = vec4(bg + tint * (0.35 * fill + line), 1.0);
+}
+[end]

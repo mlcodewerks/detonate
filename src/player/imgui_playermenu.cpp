@@ -3,6 +3,9 @@
 #include "forkawesome.h"
 #include "IconsForkAwesome.h"
 #include "audiodecode.h"
+#include "replayer_settings.h"
+#include "imgui_shader_windows.h"
+#include <cstring>
 #include "visualization.h"
 #include "file_browser.h"
 #include <algorithm>
@@ -109,6 +112,7 @@ namespace
         ImGui::SetNextItemWidth(180.0f);
         ImGui::Combo("Visualization", &visualization, "Off\0Oscilloscope\0Spectrum bars\0");
         ImGui::SetItemTooltip("Press V to cycle views.");
+        shader_windows_toggle();
         if (!visualization)
             return;
 
@@ -226,6 +230,7 @@ void menus_wait()
 }
 void menus_shutdown()
 {
+    shader_windows_shutdown();
     playlist.stop();
     ++content_generation;
     pending_navigation = {};
@@ -253,6 +258,7 @@ void menus_init(float scale, int width, int height)
     config.MergeMode = true;
     config.GlyphMinAdvanceX = scale * 12.0f;
     io.Fonts->AddFontFromMemoryCompressedTTF(forkawesome_compressed_data, forkawesome_compressed_size, scale * 12.0f, &config, ranges);
+    shader_windows_init_font(scale);
     ImGui::StyleColorsDark();
     ImGui::GetStyle().FrameRounding = 3.0f;
     ImGui::GetStyle().ScaleAllSizes(scale);
@@ -263,13 +269,95 @@ void menus_init(float scale, int width, int height)
     playlist.stop();
     music_repeat(playlist.playback == directory_playlist::mode::repeat_song);
 }
+namespace
+{
+    void replayer_options_menu()
+    {
+        if (ImGui::Button("Replayer options")) ImGui::OpenPopup("Replayer options##popup");
+        ImGui::SetNextWindowSize(ImVec2(550, 520), ImGuiCond_Appearing);
+        if (!ImGui::BeginPopup("Replayer options##popup")) return;
+        ImGui::TextWrapped("Settings apply when loading a song, switching tracks, or seeking. Restart to hear changes in the current song.");
+        ImGui::BeginDisabled(music_loading() || music_trackcount() == 0);
+        if (ImGui::Button("Restart with settings")) music_setposition_async(0);
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        static std::string status;
+        if (ImGui::Button("Save defaults"))
+        {
+            std::string error;
+            status = replayer_settings::save(error) ? "Defaults saved." : error;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Restore all defaults"))
+        {
+            replayer_settings::defaults();
+            status = "Native defaults restored. Save to keep them between sessions.";
+        }
+        if (!status.empty()) ImGui::TextWrapped("%s", status.c_str());
+        const auto path = replayer_settings::file_path().u8string();
+        ImGui::TextWrapped("Defaults file: %s", reinterpret_cast<const char *>(path.c_str()));
+        ImGui::Separator();
+        ImGui::BeginChild("##replayer-controls", ImVec2(0, 0), ImGuiChildFlags_NavFlattened);
+        auto s = replayer_settings::snapshot();
+        const char *group = nullptr;
+        bool expanded = false;
+        for (const auto &o : replayer_settings::options())
+        {
+            if (!group || std::strcmp(group, o.group))
+            {
+                if (expanded) ImGui::TreePop();
+                group = o.group;
+                expanded = ImGui::TreeNode(group);
+                if (expanded)
+                {
+                    ImGui::PushID(group);
+                    if (ImGui::SmallButton("Restore defaults"))
+                    {
+                        replayer_settings::defaults(group);
+                        s = replayer_settings::snapshot();
+                        status = "Native defaults restored. Restart to apply; save to keep them between sessions.";
+                    }
+                    ImGui::PopID();
+                }
+            }
+            if (!expanded) continue;
+            ImGui::PushID(o.key);
+            ImGui::SetNextItemWidth(260);
+            int value = s[o.setting];
+            bool changed;
+            const bool eq_control = o.setting == replayer_settings::gme_treble || o.setting == replayer_settings::gme_bass;
+            ImGui::BeginDisabled(eq_control && !s[replayer_settings::gme_eq]);
+            if (o.choices) changed = ImGui::Combo(o.label, &value, o.choices);
+            else if (o.minimum == 0 && o.maximum == 1)
+            {
+                bool checked = value != 0;
+                changed = ImGui::Checkbox(o.label, &checked);
+                value = checked;
+            }
+            else changed = ImGui::SliderInt(o.label, &value, o.minimum, o.maximum, o.format);
+            if (o.help) ImGui::SetItemTooltip("%s", o.help);
+            ImGui::EndDisabled();
+            if (changed)
+            {
+                replayer_settings::set(o.setting, value);
+                s[o.setting] = value;
+                status = "Settings changed. Restart to apply; save to keep them between sessions.";
+            }
+            ImGui::PopID();
+        }
+        if (expanded) ImGui::TreePop();
+        ImGui::TextWrapped("Other replayers use their native mixer defaults.");
+        ImGui::EndChild();
+        ImGui::EndPopup();
+    }
+}
 void menus_run()
 {
     menus_poll();
     ImGui::NewFrame();
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-    ImGui::Begin("Detonate", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+    ImGui::Begin("Detonate", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
     if (ImGui::Button(music_ispaused() ? ICON_FK_PLAY " Resume" : ICON_FK_PAUSE " Pause"))
         music_pause(!music_ispaused());
     ImGui::SameLine();
@@ -294,6 +382,8 @@ void menus_run()
         music_repeat(playlist.playback == directory_playlist::mode::repeat_song);
     }
     ImGui::SetItemTooltip("Directory playback uses the folder where the song was opened. Play once stops after the last song.\nShuffle plays remaining songs without duplicates; repeat reshuffles each new pass.\nRepeat song follows native loops where available.");
+    ImGui::SameLine();
+    replayer_options_menu();
     ImGui::BeginDisabled(music_loading());
     const unsigned duration = music_getduration();
     if (music_islooping() || !duration)
@@ -356,6 +446,7 @@ void menus_run()
     {
         ImGui::TextUnformatted("Loading browser...");
         ImGui::End();
+        shader_windows_draw();
         ImGui::Render();
         return;
     }
@@ -429,6 +520,7 @@ void menus_run()
     }
     ImGui::EndChild();
     ImGui::End();
+    shader_windows_draw();
     ImGui::Render();
     if (activate >= 0)
     {

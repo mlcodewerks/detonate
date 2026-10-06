@@ -1,3 +1,4 @@
+#include "../replayer_settings.h"
 #include "replay_engine.h"
 #include "replays/Organya/OrganyaDecoder.h"
 #include "replays/V2/V2/sounddef.h"
@@ -120,6 +121,7 @@ namespace
         {
             if (!song)
                 return false;
+            KSND_SetPlayerQuality(player.get(), replayer_settings::snapshot()[replayer_settings::klys_quality]);
             KSND_PlaySong(player.get(), song.get(), 0);
             KSND_SetLooping(player.get(), 1);
             return true;

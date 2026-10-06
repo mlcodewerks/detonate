@@ -9,14 +9,6 @@ class common_decoder final : public decoder_base
     std::vector<uint8_t> bytes_;
     size_t read_frames(float *out, size_t frames) override
     {
-        // The tracker follows its own restart orders and pattern jumps. Do
-        // not rewind it at the estimated first-pass duration when looping.
-        if (type_ == AUDIO_TYPE_MOD && length_ && !loop_)
-        {
-            if (position_ >= length_)
-                return 0;
-            frames = std::min<uint64_t>(frames, length_ - position_);
-        }
         size_t got = 0;
         const int result = audio_transfer_read_f32(decoder_, type_, out, frames, &got);
         return result < 0 ? 0 : got;
@@ -32,10 +24,9 @@ class common_decoder final : public decoder_base
 
 public:
     ~common_decoder() override { stop(); }
-    bool is_module() const override { return type_ == AUDIO_TYPE_MOD; }
     std::vector<std::string> file_types() override
     {
-        return {"wav", "flac", "fla", "mp3", "ogg", "oga", "opus", "aac", "m4a", "mod", "s3m", "xm", "it"};
+        return {"wav", "flac", "fla", "mp3", "ogg", "oga", "opus", "aac", "m4a"};
     }
     bool open(const char *filename, float *rate, bool loop) override
     {
@@ -60,8 +51,6 @@ public:
             type_ = AUDIO_TYPE_AAC;
         else if (ext == ".fla")
             type_ = AUDIO_TYPE_FLAC;
-        else if (ext == ".it")
-            type_ = AUDIO_TYPE_MOD;
         else
             type_ = audio_decode_get_type(filename);
         decoder_ = audio_transfer_new(type_);

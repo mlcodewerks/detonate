@@ -1,0 +1,494 @@
+#include "ReplayAdLib.h"
+#include "adplugdb.h"
+
+#include <Audio/AudioTypes.inl.h>
+#include <Core/String.h>
+#include <Core/Window.inl.h>
+#include <IO/StreamMemory.h>
+#include <Imgui.h>
+#include <ReplayDll.h>
+
+#include "adplug/adplug.h"
+#include "adplug/emuopl.h"
+#include "adplug/kemuopl.h"
+#include "adplug/nemuopl.h"
+#include "adplug/silentopl.h"
+#include "adplug/surroundopl.h"
+#include "adplug/version.h"
+#include "adplug/wemuopl.h"
+
+#include <binio.h>
+
+namespace rePlayer
+{
+    ReplayPlugin g_replayPlugin = {
+        .replayId = eReplay::AdLib,
+        .name = "AdPlug",
+        .about = "AdPlug " ADPLUG_VERSION "\nCopyright (c) 1999-2025 Simon Peter, et al.",
+        .settings = "AdPlug " ADPLUG_VERSION,
+        .init = ReplayAdLib::Init,
+        .release = ReplayAdLib::Release,
+        .load = ReplayAdLib::Load,
+        .displaySettings = ReplayAdLib::DisplaySettings,
+        .getFileFilter = ReplayAdLib::GetFileFilters
+    };
+
+    COPLprops ReplayAdLib::CreateCore(bool isStereo)
+    {
+        COPLprops core = {
+            .use16bit = true,
+            .stereo = isStereo
+        };
+        switch (ms_opl)
+        {
+        case Opl::kDOSBoxOPL3Emulator:
+            core.opl = new CWemuopl(kSampleRate, true, isStereo);
+            break;
+        case Opl::kNukedOPL3Emulator:
+            core.opl = new CNemuopl(kSampleRate);
+            core.stereo = true;
+            break;
+        case Opl::kKenSilvermanEmulator:
+            core.opl = new CKemuopl(kSampleRate, true, isStereo);
+            break;
+        case Opl::kMameEmulator:
+            core.opl = new CEmuopl(kSampleRate, true, isStereo);
+            break;
+        }
+        return core;
+    }
+
+    class RawFileProvider : public CFileProvider, public binistream
+    {
+    public:
+        RawFileProvider(io::Stream* stream)
+            : m_stream(stream)
+        {
+        }
+
+        ~RawFileProvider()
+        {
+            if (m_otherProvider)
+                delete m_otherProvider;
+        }
+
+        binistream* open(std::string filename) const override
+        {
+            if (_stricmp(filename.c_str(), m_stream->GetName().c_str()))
+            {
+                if (!m_otherProvider)
+                {
+                    auto stream = m_stream->Open(filename);
+                    if (stream)
+                        m_otherProvider = new RawFileProvider(stream);
+                }
+                return static_cast<binistream*>(const_cast<RawFileProvider*>(m_otherProvider));
+            }
+            return static_cast<binistream*>(const_cast<RawFileProvider*>(this));
+        }
+        void close(binistream* /*stream*/) const override
+        {
+            m_stream->Seek(0, io::Stream::kSeekBegin);
+        }
+
+        void seek(long offset, Offset type) override
+        {
+            if (m_stream->Seek(offset, type == Set ? io::Stream::kSeekBegin : type == Add ? io::Stream::kSeekCurrent : io::Stream::kSeekEnd) != Status::kOk)
+                err |= Fatal;
+        }
+
+        long pos()
+        {
+            return long(m_stream->GetPosition());
+        }
+
+        Byte getByte() override
+        {
+            Byte b;
+            if (m_stream->Read(&b, 1) != 1)
+                err |= Eof;
+            return b;
+        };
+
+    private:
+        SmartPtr<io::Stream> m_stream;
+        mutable RawFileProvider* m_otherProvider = nullptr;
+    };
+
+    Replay* ReplayAdLib::Load(io::Stream* stream, CommandBuffer /*metadata*/)
+    {
+        if (stream->GetSize() < 8 || stream->GetSize() > 1024 * 1024)
+            return nullptr;
+
+        Copl* opl;
+        if (ms_surround)
+        {
+            auto a = CreateCore(false), b = CreateCore(false);
+            opl = new CSurroundopl(&a, &b, true);
+        }
+        else
+            opl = CreateCore(true).opl;
+
+        RawFileProvider file(stream);
+        auto player = CAdPlug::factory(stream->GetName(), opl, CAdPlug::players, file);
+        if (!player)
+        {
+            delete opl;
+            return nullptr;
+        }
+
+        stream->Seek(0, io::Stream::kSeekBegin);
+        auto* silentOpl = new CSilentopl;
+        RawFileProvider silentFile(stream);
+        return new ReplayAdLib(stream->GetName(), opl, player, silentOpl, CAdPlug::factory(stream->GetName(), silentOpl, CAdPlug::players, silentFile));
+    }
+
+    bool ReplayAdLib::DisplaySettings()
+    {
+        bool changed = false;
+        {
+            const char* const opls[] = { "DOSBox OPL3", "Nuked OPL3", "Ken Silverman", "Tatsuyuki Satoh MAME OPL2" };
+            changed |= ImGui::Combo("OPL Emulator", reinterpret_cast<int32_t*>(&ms_opl), opls, NumItemsOf(opls));
+            if (ImGui::IsItemHovered())
+                ImGui::Tooltip("Applied only on reload :(");
+        }
+        {
+            const char* const surround[] = { "Stereo", "Surround" };
+            changed |= ImGui::Combo("Output", &ms_surround, surround, NumItemsOf(surround));
+            if (ImGui::IsItemHovered())
+                ImGui::Tooltip("Applied only on reload :(");
+        }
+        return changed;
+    }
+
+    Array<std::pair<std::string, std::string>> ReplayAdLib::GetFileFilters()
+    {
+        Array<std::pair<std::string, std::string>> fileFilters;
+        for (auto& desc : CAdPlug::players)
+        {
+            auto& fileFilter = fileFilters.Push<std::pair<std::string, std::string>&>();
+            fileFilter.first = desc->filetype;
+            for (uint32_t i = 0; desc->get_extension(i); i++)
+            {
+                if (i != 0)
+                    fileFilter.second += ";";
+                fileFilter.second += desc->get_extension(i) + 1;
+            }
+        }
+        return fileFilters;
+    }
+
+    int32_t ReplayAdLib::ms_surround{ 0 };
+    ReplayAdLib::Opl ReplayAdLib::ms_opl{ Opl::kNukedOPL3Emulator };
+
+    bool ReplayAdLib::Init(SharedContexts* ctx, Window& window)
+    {
+        ctx->Init();
+
+        static CAdPlugDatabase db;
+        auto dbStream = io::StreamMemory::Create("", adplugdb, sizeof(adplugdb), true);
+        RawFileProvider fp(dbStream);
+        db.load(fp);
+        CAdPlug::set_database(&db);
+
+        window.RegisterSerializedData(ms_opl, "ReplayAdLibOPL");
+        window.RegisterSerializedData(ms_surround, "ReplayAdLibSurround");
+
+        std::string extensions;
+        for (auto& desc : CAdPlug::players)
+        {
+            for (uint32_t i = 0; desc->get_extension(i); i++)
+            {
+                if (!extensions.empty())
+                    extensions += ';';
+                extensions += desc->get_extension(i) + 1;
+            }
+        }
+        auto ext = new char[extensions.size() + 1];
+        memcpy(ext, extensions.c_str(), extensions.size() + 1);
+        g_replayPlugin.extensions = ext;
+
+        auto settingsLabel = std::string("AdPlug ") + CAdPlug::get_version();
+        auto settings = new char[settingsLabel.size() + 1];
+        memcpy(settings, settingsLabel.c_str(), settingsLabel.size() + 1);
+        g_replayPlugin.settings = settings;
+
+        return false;
+    }
+
+    void ReplayAdLib::Release()
+    {
+        delete[] g_replayPlugin.extensions;
+        delete[] g_replayPlugin.settings;
+    }
+
+    ReplayAdLib::~ReplayAdLib()
+    {
+        delete m_silent.player;
+        delete m_silent.opl;
+        delete m_player;
+        delete m_opl;
+    }
+
+    ReplayAdLib::ReplayAdLib(const std::string& filename, Copl* opl, CPlayer* player, Copl* silentOpl, CPlayer* silentPlayer)
+        : Replay(GetExtension(filename, player), eReplay::AdLib)
+        , m_filename(filename)
+        , m_opl(opl)
+        , m_player(player)
+        , m_silent{
+            .opl = silentOpl,
+            .player = silentPlayer
+        }
+    {
+    }
+
+    uint32_t ReplayAdLib::Render(StereoSample* output, uint32_t numSamples)
+    {
+        auto maxSamples = numSamples;
+
+        if (m_hasEnded)
+        {
+            m_hasEnded = false;
+            return 0;
+        }
+
+        auto remainingSamples = m_remainingSamples;
+        while (numSamples > 0)
+        {
+            if (remainingSamples > 0)
+            {
+                auto samplesToAdd = Min(numSamples, remainingSamples);
+
+                auto buf = reinterpret_cast<int16_t*>(output + samplesToAdd) - samplesToAdd * 2;
+                m_opl->update(buf, samplesToAdd);
+
+                remainingSamples -= samplesToAdd;
+                numSamples -= samplesToAdd;
+
+                output = output->Convert(buf, samplesToAdd);
+            }
+            else if (m_player->update())
+            {
+                remainingSamples = static_cast<uint32_t>(kSampleRate / m_player->getrefresh());
+                m_isStuck = 0;
+            }
+            else if (m_isStuck == 1)
+            {
+                m_player->rewind(m_subsongIndex);
+                m_isStuck++;
+            }
+            else
+            {
+                m_isStuck++;
+                m_hasEnded = m_isStuck > 1 || numSamples != maxSamples;
+                break;
+            }
+        }
+        m_remainingSamples = remainingSamples;
+
+        return maxSamples - numSamples;
+    }
+
+    uint32_t ReplayAdLib::Seek(uint32_t timeInMs)
+    {
+        m_player->rewind(m_subsongIndex);
+        m_silent.player->rewind(m_subsongIndex);
+
+        uint32_t pos = 0;
+        while (pos < timeInMs)
+        {
+            m_player->update();
+            m_silent.player->update();
+            pos += uint32_t(1000 / m_player->getrefresh());
+        }
+        return pos;
+    }
+
+    void ReplayAdLib::ResetPlayback()
+    {
+        m_player->rewind(m_subsongIndex);
+        m_remainingSamples = 0;
+        m_isStuck = 0;
+        m_hasEnded = false;
+    }
+
+    void ReplayAdLib::ApplySettings(const CommandBuffer /*metadata*/)
+    {
+    }
+
+    void ReplayAdLib::SetSubsong(uint32_t subsongIndex)
+    {
+        m_subsongIndex = subsongIndex;
+        m_player->rewind(subsongIndex);
+
+        m_silent.player->rewind(subsongIndex);
+        // clear properties
+        m_silent.properties.Clear();
+        // push empty property info
+        auto* property = m_silent.properties.Push();
+        property->label = "Info";
+        property->numColumns = 2;
+        if (auto numInstruments = m_player->getinstruments())
+        {
+            property = m_silent.properties.Push();
+            property->label = "Instruments";
+            property->numColumns = 1;
+            bool isEmpty = true;
+            for (uint32_t i = 0; i < numInstruments; i++)
+            {
+                auto str = m_player->getinstrument(i);
+                isEmpty &= str.empty() || str[0] == 0;
+                property->Add(str.c_str(), Property::kIsEditable);
+            }
+            if (isEmpty)
+                m_silent.properties.Pop();
+        }
+    }
+
+    const char* ReplayAdLib::GetExtension(const std::string& filename, CPlayer* player)
+    {
+        auto extOffset = filename.find_last_of('.');
+
+        const char* ext = nullptr;
+        for (int32_t i = 0; player->player_desc->get_extension(i); i++)
+        {
+            auto playerExt = player->player_desc->get_extension(i);
+            if (!ext)
+            {
+                ext = playerExt;
+                if (extOffset == filename.npos)
+                    break;
+            }
+            if (_stricmp(playerExt, filename.c_str() + extOffset) == 0)
+            {
+                ext = playerExt;
+                break;
+            }
+        }
+        return ext + 1;
+    }
+
+    uint32_t ReplayAdLib::GetDurationMs() const
+    {
+        return m_player->songlength(m_subsongIndex);
+    }
+
+    uint32_t ReplayAdLib::GetNumSubsongs() const
+    {
+        return m_player->getsubsongs();
+    }
+
+    std::string ReplayAdLib::GetExtraInfo() const
+    {
+        std::string info;
+        if (!m_player->gettitle().empty())
+            info += m_player->gettitle();
+        if (!m_player->getauthor().empty())
+        {
+            if (!info.empty())
+                info += "\n";
+            info += m_player->getauthor();
+        }
+        if (!m_player->getdesc().empty())
+        {
+            if (!info.empty())
+                info += "\n";
+            info += m_player->getdesc();
+        }
+        for (uint32_t i = 0, e = m_player->getinstruments(); i < e; i++)
+        {
+            if (!m_player->getinstrument(i).empty())
+            {
+                if (!info.empty())
+                    info += "\n";
+                info += m_player->getinstrument(i);
+            }
+        }
+        return info;
+    }
+
+    std::string ReplayAdLib::GetInfo() const
+    {
+        std::string info = "2 Channels\n";
+        info += m_player->gettype();
+        info += "\nAdPlug ";
+        info += CAdPlug::get_version();
+        return info;
+    }
+
+    Replay::Patterns ReplayAdLib::UpdatePatterns(uint32_t numSamples, uint32_t numLines, uint32_t charWidth, uint32_t spaceWidth, Patterns::Flags flags)
+    {
+        UnusedArg(numLines, charWidth, spaceWidth, flags);
+        if (numSamples > 0)
+        {
+            auto remainingSamples = m_silent.remainingSamples;
+            while (numSamples > 0)
+            {
+                if (remainingSamples > 0)
+                {
+                    auto samplesToAdd = Min(numSamples, remainingSamples);
+                    remainingSamples -= samplesToAdd;
+                    numSamples -= samplesToAdd;
+                }
+                else if (m_silent.player->update())
+                {
+                    remainingSamples = static_cast<uint32_t>(kSampleRate / m_silent.player->getrefresh());
+                    m_silent.isStuck = 0;
+                }
+                else
+                {
+                    if (m_silent.isStuck == 1)
+                        m_silent.player->rewind(m_subsongIndex);
+                    m_silent.isStuck++;
+                }
+            }
+            m_silent.remainingSamples = remainingSamples;
+        }
+        return {};
+    }
+
+    const Replay::Properties& ReplayAdLib::BuildProperties()
+    {
+        // build realtime basic info
+        auto& property = m_silent.properties[0];
+        property.numEntries = 0;
+        property.data.Clear();
+
+        auto str = m_silent.player->getauthor();
+        if (!str.empty())
+            property.Add("Artist", Property::kIsNotEditable, str.c_str(), Property::kIsEditable);
+        str = m_silent.player->gettitle();
+        if (!str.empty())
+            property.Add("Title", Property::kIsNotEditable, str.c_str(), Property::kIsEditable);
+        str = m_silent.player->getdesc();
+        if (!str.empty())
+            property.Add("Description", Property::kIsNotEditable, str.c_str(), Property::kIsEditable);
+        str = m_silent.player->gettype();
+        if (!str.empty())
+            property.Add("Type", Property::kIsNotEditable, str.c_str(), Property::kIsEditable);
+
+        char buf[16];
+        sprintf(buf, "%.2fHz", m_silent.player->getrefresh());
+        property.Add("Refresh", Property::kIsNotEditable, buf, Property::kIsNotEditable);
+        if (m_silent.player->getspeed())
+        {
+            sprintf(buf, "%u", m_silent.player->getspeed());
+            property.Add("Speed", Property::kIsNotEditable, buf, Property::kIsNotEditable);
+        }
+        if (m_silent.player->getorders())
+        {
+            sprintf(buf, "%d", m_silent.player->getorder());
+            property.Add("Order", Property::kIsNotEditable, buf, Property::kIsNotEditable);
+            sprintf(buf, "%d", m_silent.player->getrow());
+            property.Add("Row", Property::kIsNotEditable, buf, Property::kIsNotEditable);
+        }
+        if (m_silent.player->getpatterns())
+        {
+            sprintf(buf, "%d", m_silent.player->getpattern());
+            property.Add("Pattern", Property::kIsNotEditable, buf, Property::kIsNotEditable);
+        }
+
+        return m_silent.properties;
+    }
+}
+// namespace rePlayer

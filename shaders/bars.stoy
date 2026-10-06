@@ -1,0 +1,32 @@
+stoy 1
+# A small feedback buffer holds falling peak levels.
+[pass levels]
+scale=0.25
+channel0=spectrum
+channel1=previous
+shader:
+void mainImage(out vec4 color, in vec2 fragCoord)
+{
+    vec2 uv = fragCoord / iResolution.xy;
+    float x = (floor(uv.x * 32.0) + 0.5) / 32.0;
+    float current = texture(iChannel0, vec2(x, 0.5)).r;
+    float old = texture(iChannel1, vec2(x, 0.5)).r;
+    color = vec4(max(current, old - iTimeDelta * 0.4), current, 0.0, 1.0);
+}
+[end]
+[pass image]
+channel0=levels
+shader:
+void mainImage(out vec4 color, in vec2 fragCoord)
+{
+    vec2 uv = fragCoord / iResolution.xy;
+    float x = (floor(uv.x * 32.0) + 0.5) / 32.0;
+    vec2 levels = texture(iChannel0, vec2(x, 0.5)).rg;
+    float y = (uv.y - 0.06) / 0.88;
+    float gap = step(0.12, fract(uv.x * 32.0)) * step(fract(uv.x * 32.0), 0.88);
+    float bar = step(0.0, y) * step(y, levels.g) * gap;
+    float peak = (1.0 - smoothstep(0.0, 3.0 / iResolution.y, abs(y - levels.r))) * gap;
+    vec3 tint = mix(vec3(0.1, 0.85, 0.65), vec3(1.0, 0.45, 0.25), clamp(y, 0.0, 1.0));
+    color = vec4(vec3(0.025, 0.04, 0.07) + tint * bar + vec3(0.95) * peak, 1.0);
+}
+[end]

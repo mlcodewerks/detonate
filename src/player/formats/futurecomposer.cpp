@@ -1,3 +1,4 @@
+#include "../replayer_settings.h"
 #include "replay_engine.h"
 #include "replays/FutureComposer/libtfmxaudiodecoder/src/DecoderProxy.h"
 #include "futurecomposer_format.h"
@@ -95,7 +96,10 @@ namespace
         {
             if (!decoder || song >= tracks)
                 return false;
-            mixer.init(rate, 16, 2, 0, 100);
+            const auto s = replayer_settings::snapshot();
+            // init rebuilds the pan tables; setPanning alone only stores a value.
+            mixer.init(rate, 16, 2, 0, 50 + s[replayer_settings::fc_separation] / 2);
+            mixer.setFiltering(s[replayer_settings::fc_filter]);
             if (!decoder->reinit(int(song)))
                 return false;
             duration = decoder->getDuration();

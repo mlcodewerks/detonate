@@ -1,0 +1,14 @@
+This plugin's integration code (pretracker_plugin.c and CMakeLists.txt) is
+licensed under the MIT License. See pretracker/LICENSE.
+
+Bundled replayer:
+=================
+
+PreTracker C Player (pretracker/)
+License: MIT
+Source: https://github.com/RetrovertApp/playback-pretracker
+Authors: Chris 'platon42' Hodges and Daniel Collin
+
+The replayer is an independent C port of the Raspberry Casket Amiga
+PreTracker replayer. The original PreTracker format and player are by
+Pink / Abyss.

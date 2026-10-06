@@ -2,5 +2,7 @@
 /build-*/
 /compile_dir/
 /.upstream/
+/detonate-replayers.ini
+/detonate-replayers.ini.tmp
 /libretro-common.zip
 /upstream-libretro-common.json

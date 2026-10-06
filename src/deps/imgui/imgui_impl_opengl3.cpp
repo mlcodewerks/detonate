@@ -132,7 +132,12 @@
 #ifndef IMGUI_DISABLE
 #include "imgui_impl_opengl3.h"
 #define IMGUI_IMPL_OPENGL_LOADER_CUSTOM
+#ifdef IMGUI_IMPL_OPENGL_ES2
+#include "glsym/gles2_loader.h"
+#else
 #include "glsym/glsym.h"
+#include "glsym/glsym_gl11.h"
+#endif
 #include <stdio.h>
 #include <stdint.h>     // intptr_t
 #if defined(__APPLE__)
@@ -1019,6 +1024,23 @@ bool    ImGui_ImplOpenGL3_CreateDeviceObjects()
     return true;
 }
 
+void    ImGui_ImplOpenGL3_AbandonDeviceObjects()
+{
+    ImGui_ImplOpenGL3_Data* bd = ImGui_ImplOpenGL3_GetBackendData();
+    if (!bd) return;
+#ifdef IMGUI_IMPL_OPENGL_MAY_HAVE_BIND_SAMPLER
+    bd->TexSamplers[0] = bd->TexSamplers[1] = 0;
+#endif
+    bd->VboHandle = bd->ElementsHandle = bd->ShaderHandle = 0;
+    for (ImTextureData* tex : ImGui::GetPlatformIO().Textures)
+        if (tex->RefCount == 1)
+        {
+            tex->SetTexID(ImTextureID_Invalid);
+            tex->SetStatus(ImTextureStatus_Destroyed);
+            tex->BackendUserData = nullptr;
+        }
+}
+
 void    ImGui_ImplOpenGL3_DestroyDeviceObjects()
 {
     ImGui_ImplOpenGL3_InitLoader();
@@ -1032,7 +1054,7 @@ void    ImGui_ImplOpenGL3_DestroyDeviceObjects()
 
     // Destroy all textures
     for (ImTextureData* tex : ImGui::GetPlatformIO().Textures)
-        if (tex->RefCount == 1)
+        if (tex->RefCount == 1 && tex->TexID != ImTextureID_Invalid)
             ImGui_ImplOpenGL3_DestroyTexture(tex);
 }
 
@@ -1057,6 +1079,7 @@ bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
     // GLES 2
     bd->GlVersion = 200;
     bd->GlProfileIsES2 = true;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &bd->MaxTextureSize);
     IM_UNUSED(gl_version_str);
 #else
     // Desktop or GLES 3

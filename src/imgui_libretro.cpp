@@ -267,6 +267,8 @@ bool ImGui_ImplLibretro_Init()
     ImGuiIO &io = ImGui::GetIO();
     io.BackendPlatformName = "imgui_impl_libretro";
     io.MouseDrawCursor = true;
+    io.GetClipboardTextFn = NULL;
+    io.SetClipboardTextFn = NULL;
     return true;
 }
 

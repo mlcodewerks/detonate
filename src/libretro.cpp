@@ -3,10 +3,71 @@
 #include "imgui_libretro.h"
 #include "imgui_sw.hpp"
 #include "audiodecode.h"
+#include "player/replayer_settings.h"
 #include "archive_reader.h"
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstring>
+extern retro_environment_t environ_cb;
+#if defined(DETONATE_GL33) || defined(DETONATE_GLES2)
+#define DETONATE_HW
+#endif
+#ifdef DETONATE_GL33
+#include "glsym/glsym.h"
+#include "glsym/glsym_gl11.h"
+#include "imgui_impl_opengl3.h"
+#endif
+#ifdef DETONATE_GLES2
+#include "gles2_renderer.h"
+#endif
+#ifdef DETONATE_HW
+#include "shader_renderer.h"
+static retro_hw_render_callback hw{};
+static bool hardware = false, gl_ready = false, use_gles2 = false;
+static void destroy_renderer(bool lost)
+{
+    shader_renderer_shutdown(lost);
+    if (!gl_ready) return;
+#ifdef DETONATE_GLES2
+    if (use_gles2) gles2_shutdown(lost);
+#endif
+#ifdef DETONATE_GL33
+    if (!use_gles2)
+    {
+        if (lost) ImGui_ImplOpenGL3_AbandonDeviceObjects();
+        ImGui_ImplOpenGL3_Shutdown();
+    }
+#endif
+    gl_ready = false;
+}
+static void context_destroy() { destroy_renderer(false); }
+static void context_reset()
+{
+    // Reset without destroy notification means the previous context is gone.
+    destroy_renderer(true);
+#ifdef DETONATE_GLES2
+    if (use_gles2) gl_ready = gles2_init(hw.get_proc_address);
+#endif
+#ifdef DETONATE_GL33
+    if (!use_gles2)
+    {
+        rglgen_resolve_symbols(hw.get_proc_address);
+        if (detonate_gl11_resolve(hw.get_proc_address))
+            gl_ready = ImGui_ImplOpenGL3_Init("#version 330 core");
+        if (gl_ready && !ImGui_ImplOpenGL3_CreateDeviceObjects())
+            context_destroy();
+    }
+#endif
+    if (!gl_ready)
+    {
+        std::fprintf(stderr, "Detonate: unable to initialize %s renderer.\n", use_gles2 ? "GLES2" : "OpenGL 3.3");
+        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, nullptr);
+    }
+    else if (!shader_renderer_init(hw.get_proc_address, use_gles2))
+        std::fprintf(stderr, "Detonate: shader visualization entry points unavailable.\n");
+}
+#endif
 
 retro_environment_t environ_cb = nullptr;
 retro_video_refresh_t video_cb = nullptr;
@@ -30,9 +91,17 @@ static void shutdown_ui()
     menus_shutdown();
     if (!ImGui::GetCurrentContext())
         return;
-    imgui_sw::unbind_imgui_painting();
+#ifdef DETONATE_HW
+    if (hardware)
+        context_destroy();
+    else
+#endif
+        imgui_sw::unbind_imgui_painting();
     ImGui_ImplLibretro_Shutdown();
     ImGui::DestroyContext();
+#ifdef DETONATE_HW
+    hardware = false;
+#endif
 }
 
 RETRO_API void retro_set_environment(retro_environment_t cb)
@@ -44,6 +113,18 @@ RETRO_API void retro_set_environment(retro_environment_t cb)
     cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_game);
     retro_keyboard_callback keyboard = {ImGui_ImpLibretro_ProcessKeys};
     cb(RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK, &keyboard);
+#ifdef DETONATE_HW
+    static const retro_variable options[] = {
+        {"detonate_renderer", "Renderer (restart required); software"
+#ifdef DETONATE_GL33
+         "|gl33"
+#endif
+#ifdef DETONATE_GLES2
+         "|gles2"
+#endif
+        }, {nullptr, nullptr}};
+    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void *)options);
+#endif
 }
 RETRO_API void retro_set_video_refresh(retro_video_refresh_t cb)
 {
@@ -65,7 +146,16 @@ RETRO_API void retro_set_input_state(retro_input_state_t cb)
 {
     input_state_cb = cb;
 }
-RETRO_API void retro_init() {}
+RETRO_API void retro_init()
+{
+    const char *directory = nullptr;
+    if (environ_cb) environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &directory);
+    std::error_code ec;
+    auto path = directory && *directory ? std::filesystem::u8path(directory) : std::filesystem::current_path(ec);
+    std::string error;
+    if (!replayer_settings::load(path / "detonate-replayers.ini", error))
+        std::fprintf(stderr, "Detonate: %s\n", error.c_str());
+}
 RETRO_API void retro_deinit()
 {
     menus_wait();
@@ -105,7 +195,34 @@ extern "C" RETRO_API bool detonate_load_game_async(const retro_game_info *game)
     {
         menus_init(1.5f, width, height);
         ImGui_ImplLibretro_Init();
-        imgui_sw::bind_imgui_painting();
+#ifdef DETONATE_HW
+        retro_variable renderer{"detonate_renderer", nullptr};
+        bool request_gl = false;
+        if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &renderer) && renderer.value)
+        {
+            use_gles2 = false;
+#ifdef DETONATE_GL33
+            request_gl = !std::strcmp(renderer.value, "gl33");
+#endif
+#ifdef DETONATE_GLES2
+            use_gles2 = !std::strcmp(renderer.value, "gles2");
+            request_gl = request_gl || use_gles2;
+#endif
+        }
+        if (request_gl)
+        {
+            hw = {};
+            hw.context_type = use_gles2 ? RETRO_HW_CONTEXT_OPENGLES2 : RETRO_HW_CONTEXT_OPENGL_CORE;
+            hw.version_major = use_gles2 ? 2 : 3;
+            hw.version_minor = use_gles2 ? 0 : 3;
+            hw.bottom_left_origin = true;
+            hw.context_reset = context_reset;
+            hw.context_destroy = context_destroy;
+            hardware = environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw);
+        }
+        if (!hardware)
+#endif
+            imgui_sw::bind_imgui_painting();
     }
     menu_request_content(game ? game->path : nullptr);
     loaded = true;
@@ -165,18 +282,61 @@ RETRO_API void retro_run()
         }
         else
         {
-            
+
             for (int i = 0; i < 3; ++i)
                 ImGui_ImplLibretro_ProcessMouse(i, false, mouse_x, mouse_y);
         }
+#ifdef DETONATE_HW
+        if (hardware && !gl_ready)
+        {
+            if (video_cb)
+                video_cb(nullptr, width, height, 0);
+            music_run();
+            return;
+        }
+        if (hardware)
+        {
+#ifdef DETONATE_GLES2
+            if (use_gles2) gles2_new_frame();
+#endif
+#ifdef DETONATE_GL33
+            if (!use_gles2) ImGui_ImplOpenGL3_NewFrame();
+#endif
+        }
+#endif
         ImGui_ImplLibretro_NewFrame();
         menus_run();
-        framebuffer.fill(0);
-        imgui_sw::paint_imgui(framebuffer.data(), ImGui::GetDrawData());
-        for (auto &pixel : framebuffer)
-            pixel = (((pixel >> IM_COL32_R_SHIFT) & 255u) << 16) | (((pixel >> IM_COL32_G_SHIFT) & 255u) << 8) | ((pixel >> IM_COL32_B_SHIFT) & 255u);
-        if (video_cb)
-            video_cb(framebuffer.data(), width, height, width * sizeof(uint32_t));
+#ifdef DETONATE_HW
+        if (hardware)
+        {
+#ifdef DETONATE_GLES2
+            if (use_gles2) gles2_render(hw.get_current_framebuffer());
+#endif
+#ifdef DETONATE_GL33
+            if (!use_gles2)
+            {
+                glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)hw.get_current_framebuffer());
+                glDisable(GL_SCISSOR_TEST);
+                glDisable(GL_FRAMEBUFFER_SRGB);
+                glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+                glClearColor(0, 0, 0, 1);
+                glClear(GL_COLOR_BUFFER_BIT);
+                ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            }
+#endif
+            if (video_cb)
+                video_cb(RETRO_HW_FRAME_BUFFER_VALID, width, height, 0);
+        }
+        else
+#endif
+        {
+            framebuffer.fill(0);
+            imgui_sw::paint_imgui(framebuffer.data(), ImGui::GetDrawData());
+            for (auto &pixel : framebuffer)
+                pixel = (((pixel >> IM_COL32_R_SHIFT) & 255u) << 16) | (((pixel >> IM_COL32_G_SHIFT) & 255u) << 8) | ((pixel >> IM_COL32_B_SHIFT) & 255u);
+            if (video_cb)
+                video_cb(framebuffer.data(), width, height, width * sizeof(uint32_t));
+        }
     }
     else if (video_cb)
         video_cb(nullptr, width, height, width * sizeof(uint32_t));

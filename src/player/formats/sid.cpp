@@ -1,3 +1,4 @@
+#include "../replayer_settings.h"
 #include "replay_engine.h"
 #include "replays/SidPlay/libsidplayfp/sidplayfp/sidplayfp.h"
 #include "replays/SidPlay/libsidplayfp/sidplayfp/SidTune.h"
@@ -32,8 +33,6 @@ namespace
                 title = info->infoString(0);
             if (info->numberOfInfoStrings() > 1)
                 artist = info->infoString(1);
-            builder = std::make_unique<ReSIDfpBuilder>("Detonate");
-            player = std::make_unique<sidplayfp>();
             auto dir = std::filesystem::path(reinterpret_cast<const char8_t *>(path)).parent_path();
             auto rom = [&dir](const char *name, size_t size)
             {
@@ -46,21 +45,30 @@ namespace
             kernal = rom("kernal", 8192);
             basic = rom("basic", 8192);
             character = rom("chargen", 4096);
-            if (!kernal.empty())
-                player->setRoms(kernal.data(), basic.empty() ? nullptr : basic.data(), character.empty() ? nullptr : character.data());
-            SidConfig cfg;
-            cfg.frequency = rate;
-            cfg.sidEmulation = builder.get();
-            cfg.powerOnDelay = 0;
-            cfg.samplingMethod = SidConfig::RESAMPLE_INTERPOLATE;
-            if (!player->config(cfg))
-                throw std::runtime_error(player->error());
             return true;
         }
         bool reset(unsigned i) override
         {
             if (!tune || i >= tracks)
                 return false;
+            // Recreate the chips so switching models or filters does not carry
+            // analogue state from the previous run into the restarted song.
+            player.reset();
+            builder = std::make_unique<ReSIDfpBuilder>("Detonate");
+            player = std::make_unique<sidplayfp>();
+            if (!kernal.empty())
+                player->setRoms(kernal.data(), basic.empty() ? nullptr : basic.data(), character.empty() ? nullptr : character.data());
+            const auto s = replayer_settings::snapshot();
+            SidConfig cfg;
+            cfg.frequency = rate;
+            cfg.sidEmulation = builder.get();
+            cfg.powerOnDelay = 0;
+            cfg.samplingMethod = s[replayer_settings::sid_sampling] ? SidConfig::INTERPOLATE : SidConfig::RESAMPLE_INTERPOLATE;
+            cfg.forceSidModel = s[replayer_settings::sid_model] != 0;
+            cfg.defaultSidModel = s[replayer_settings::sid_model] == 2 ? SidConfig::MOS8580 : SidConfig::MOS6581;
+            builder->filter6581Curve(s[replayer_settings::sid_6581_curve] / 100.0);
+            builder->filter8580Curve(s[replayer_settings::sid_8580_curve] / 100.0);
+            if (!player->config(cfg)) throw std::runtime_error(player->error());
             tune->selectSong(i + 1);
             if (!player->load(tune.get()))
                 throw std::runtime_error(player->error());
