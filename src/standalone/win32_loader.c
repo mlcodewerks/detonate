@@ -55,6 +55,7 @@ static LONG saved_style;
 static int mouse_x, mouse_y, mouse_dx, mouse_dy, mouse_wheel, pending_wheel;
 static pointer_event *mouse_head, *mouse_tail;
 static WCHAR pending_file[PATH_CHARS], library_path[PATH_CHARS];
+static char system_directory[PATH_CHARS * 4];
 static WORD high_surrogate;
 static const WCHAR *failure;
 static BOOL use_gl, use_gles2;
@@ -523,6 +524,22 @@ static bool RETRO_CALLCONV environment(unsigned command, void *data)
 {
     switch (command)
     {
+    case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+    {
+        if (!system_directory[0])
+        {
+            static WCHAR path[PATH_CHARS];
+            DWORD length = GetModuleFileNameW(NULL, path, PATH_CHARS);
+            if (!length || length >= PATH_CHARS) return false;
+            while (length && path[length - 1] != L'\\' && path[length - 1] != L'/') --length;
+            if (length + 7 >= PATH_CHARS) return false;
+            lstrcpyW(path + length, L"system");
+            if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path, -1,
+                system_directory, sizeof(system_directory), NULL, NULL)) return false;
+        }
+        *(const char **)data = system_directory;
+        return true;
+    }
     case RETRO_ENVIRONMENT_SET_VARIABLES:
         return true;
     case RETRO_ENVIRONMENT_GET_VARIABLE:

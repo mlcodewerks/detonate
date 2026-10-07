@@ -12,7 +12,7 @@ namespace replayer_settings
         uade_resampler, uade_filter, uade_led,
         sid_sampling, sid_model, sid_6581_curve, sid_8580_curve,
         ahx_separation, fc_separation, fc_filter, klys_quality,
-        gme_eq, gme_treble, gme_bass, adlib_surround, count
+        gme_eq, gme_treble, gme_bass, adlib_surround, midi_backend, count
     };
     struct option
     {

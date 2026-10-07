@@ -32,6 +32,7 @@ namespace replayer_settings
             {gme_treble, "gme.treble", "Game Music Emu", "Treble", -50, 5, 0, nullptr, nullptr, "%d dB"},
             {gme_bass, "gme.bass", "Game Music Emu", "Bass cutoff", 20, 500, 80, nullptr, nullptr, "%d Hz"},
             {adlib_surround, "adlib.surround", "AdLib", "Harmonic stereo", 0, 1, 0, nullptr, "Adds stereo width with a slightly detuned second OPL chip."},
+            {midi_backend, "midi.backend", "MIDI", "Synthesizer", 0, 4, 0, "SpessaSynth\0S-MU2000\0" "88emu SC-55\0" "88emu SC-55mkII\0" "88emu SC-8850\0", "Applies when loading, restarting or seeking. Resources: system/detonatemidi."},
         };
         static_assert(std::size(catalog) == count);
         values native_defaults()

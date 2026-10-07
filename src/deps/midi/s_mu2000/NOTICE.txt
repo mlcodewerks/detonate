@@ -1,0 +1,240 @@
+S-MU2000
+Copyright (c) 2026, tarboh
+https://github.com/tarboh/S-MU2000
+
+BSD 3-Clause License. See LICENSE for the full text.
+
+This product includes software from the projects listed below. Each is
+distributed under its own license, reproduced or referenced here as those
+licenses require. The per-file "license:" and "copyright-holders:" lines in
+the source are authoritative.
+
+
+--------------------------------------------------------------------------
+MAME  --  chip and machine implementations
+--------------------------------------------------------------------------
+
+BSD 3-Clause License
+
+  src/mame/sound/swp30.*        Copyright (c) Olivier Galibert
+  src/mame/cpu/sh7042*          Copyright (c) Olivier Galibert
+  src/mame/cpu/sh_*             Copyright (c) Olivier Galibert
+  src/mame/machine/sci4.*       Copyright (c) Olivier Galibert
+  src/mame/ymmu2000.cpp         Copyright (c) Olivier Galibert
+  src/mame/cpu/sh.*             Copyright (c) David Haywood
+  src/mame/cpu/sh2.*            Copyright (c) David Haywood
+  src/mame/cpu/sh_dasm.cpp      Copyright (c) David Haywood
+  src/mame/video/hd44780.*      Copyright (c) Sandro Ronco
+
+Taken from MAME (https://github.com/mamedev/mame) at 0.289, master
+2026-09-06, commit 1fb001f9, and modified. Modifications are marked in the
+source with "S-MU2000:".
+
+MAME as a whole is distributed under the GNU General Public License, but
+these individual device implementations carry BSD 3-Clause headers of their
+own, which is what permits their use here. No part of MAME outside those
+files is used, and MAME is not linked.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+  3. Neither the name of the copyright holder nor the names of its
+     contributors may be used to endorse or promote products derived from
+     this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+  IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--------------------------------------------------------------------------
+VST 3 interface definitions  --  third_party/vst3
+--------------------------------------------------------------------------
+
+MIT License
+Copyright (c) 2026, Steinberg Media Technologies GmbH
+https://github.com/steinbergmedia/vst3_pluginterfaces
+
+Only the interface definitions (pluginterfaces) are used. The VST 3 SDK
+proper (public.sdk), which is offered under GPLv3 or a Steinberg
+proprietary licence, is not used. Full text in
+third_party/vst3/LICENSE.txt.
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit
+  persons to whom the Software is furnished to do so, subject to the
+  following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+  NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+  USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+VST is a trademark of Steinberg Media Technologies GmbH, registered in
+Europe and other countries.
+
+
+--------------------------------------------------------------------------
+CLAP  --  third_party/clap
+--------------------------------------------------------------------------
+
+MIT License
+Copyright (c) 2021 Alexandre BIQUE
+https://github.com/free-audio/clap
+
+Version 1.2.10 (commit 195b42a0). Only the headers are used, unmodified,
+for the CLAP plug-in. Full text in third_party/clap/LICENSE.txt.
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit
+  persons to whom the Software is furnished to do so, subject to the
+  following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+  NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+  USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+--------------------------------------------------------------------------
+Dear ImGui  --  third_party/imgui
+--------------------------------------------------------------------------
+
+MIT License
+Copyright (c) 2014-2026 Omar Cornut
+https://github.com/ocornut/imgui
+
+Version 1.92.9b (commit f1cc2ae1). The core and the Win32 / Direct3D 11
+backends are used, unmodified, for the PC editor window of gui.exe. Full
+text in third_party/imgui/LICENSE.txt.
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit
+  persons to whom the Software is furnished to do so, subject to the
+  following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+  NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+  USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+--------------------------------------------------------------------------
+earcut.hpp  --  third_party/earcut.hpp
+--------------------------------------------------------------------------
+
+ISC License
+Copyright (c) 2015, Mapbox
+https://github.com/mapbox/earcut.hpp
+
+Header-only polygon triangulation with holes (commit 177bd66b53). Only
+include/mapbox/earcut.hpp is used, unmodified, for SVG fills. Full text in
+third_party/earcut.hpp/LICENSE.txt.
+
+  Permission to use, copy, modify, and/or distribute this software for any purpose
+  with or without fee is hereby granted, provided that the above copyright notice
+  and this permission notice appear in all copies.
+
+  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+  REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+  FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+  INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+  OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+  TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+  THIS SOFTWARE.
+
+
+--------------------------------------------------------------------------
+Panel artwork  --  art/mame/
+--------------------------------------------------------------------------
+
+CC0 1.0 Universal (public domain dedication)
+by hap and Felipe Sanches
+
+Extracted from MAME's src/mame/layout/mu2000.lay. See art/mame/README.md.
+The button, LED and knob artwork in art/parts/ is original to this project
+and is BSD 3-Clause like the rest.
+
+
+--------------------------------------------------------------------------
+Adafruit GFX Library  --  tools/dump/ref/glcdfont.c
+--------------------------------------------------------------------------
+
+BSD 2-Clause License
+Copyright (c) 2012 Adafruit Industries
+https://github.com/adafruit/Adafruit-GFX-Library
+
+The classic 5x7 fixed-width font. tools/dump/make_standins.py turns it into
+a stand-in for the HD44780 character generator, for people who have not
+dumped that ROM from their own hardware. It is not the real font.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+  IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  EXEMPLARY, OR CONSEQUENTIAL DAMAGES HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--------------------------------------------------------------------------
+Not included
+--------------------------------------------------------------------------
+
+No Yamaha ROM data is included: not the program ROM, not the wave ROMs, not
+the LCD character generator. They must be dumped from your own hardware.
+
+Yamaha, MU2000 and XG are trademarks of Yamaha Corporation. This project is
+not affiliated with, endorsed by, or supported by Yamaha.

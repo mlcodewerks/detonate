@@ -1,0 +1,167 @@
+/**
+ * utils.c
+ * Biquad, pan table and LFO helpers shared by the insertion effects.
+ *
+ * Port of upstream effects/insertion/utils.ts.
+ */
+
+#include "insertion_internal.h"
+
+/* ── Biquad helpers ──────────────────────────────────────────────────────── */
+
+
+void ss_biquad_zero(SS_BiquadState *s) {
+	s->x1 = s->x2 = s->y1 = s->y2 = 0;
+}
+
+/* Identity passthrough coefficients */
+void ss_biquad_identity(SS_Biquad *c) {
+	c->b0 = 1;
+	c->b1 = 0;
+	c->b2 = 0;
+	c->a1 = 0;
+	c->a2 = 0;
+}
+
+/* Apply low shelf then high shelf inline */
+
+/* Robert Bristow-Johnson shelf (S=1) */
+void ss_compute_shelf(SS_Biquad *c, double db_gain, double f0, double fs, int is_low) {
+	const double A = pow(10.0, db_gain / 40.0);
+	const double w0 = 2.0 * M_PI * f0 / fs;
+	const double cw = cos(w0), sw = sin(w0);
+	const double alpha = (sw / 2.0) * sqrt((A + 1.0 / A) * (1.0 / 1.0 - 1) + 2.0);
+	double b0, b1, b2, a0, a1, a2;
+	const double sA = sqrt(A);
+	if(is_low) {
+		b0 = A * (A + 1 - (A - 1) * cw + 2 * sA * alpha);
+		b1 = 2 * A * (A - 1 - (A + 1) * cw);
+		b2 = A * (A + 1 - (A - 1) * cw - 2 * sA * alpha);
+		a0 = A + 1 + (A - 1) * cw + 2 * sA * alpha;
+		a1 = -2 * (A - 1 + (A + 1) * cw);
+		a2 = A + 1 + (A - 1) * cw - 2 * sA * alpha;
+	} else {
+		b0 = A * (A + 1 + (A - 1) * cw + 2 * sA * alpha);
+		b1 = -2 * A * (A - 1 + (A + 1) * cw);
+		b2 = A * (A + 1 + (A - 1) * cw - 2 * sA * alpha);
+		a0 = A + 1 - (A - 1) * cw + 2 * sA * alpha;
+		a1 = 2 * (A - 1 - (A + 1) * cw);
+		a2 = A + 1 - (A - 1) * cw - 2 * sA * alpha;
+	}
+	c->b0 = b0 / a0;
+	c->b1 = b1 / a0;
+	c->b2 = b2 / a0;
+	c->a1 = a1 / a0;
+	c->a2 = a2 / a0;
+}
+
+/* Peaking EQ (used by StereoEQ mid bands) */
+void ss_compute_peaking_eq(SS_Biquad *c, double freq, double gain_db, double Q, double fs) {
+	const double A = pow(10.0, gain_db / 40.0);
+	const double w0 = 2.0 * M_PI * freq / fs;
+	const double cw = cos(w0), sw = sin(w0);
+	const double alpha = sw / (2.0 * Q);
+	const double b0 = 1 + alpha * A;
+	const double b1 = -2 * cw;
+	const double b2 = 1 - alpha * A;
+	const double a0 = 1 + alpha / A;
+	const double a1 = -2 * cw;
+	const double a2 = 1 - alpha / A;
+	c->b0 = b0 / a0;
+	c->b1 = b1 / a0;
+	c->b2 = b2 / a0;
+	c->a1 = a1 / a0;
+	c->a2 = a2 / a0;
+}
+
+/* Low shelf used by StereoEQ (same formula but standalone) */
+void ss_compute_low_shelf(SS_Biquad *c, double freq, double gain_db, double fs) {
+	ss_compute_shelf(c, gain_db, freq, fs, 1);
+}
+
+void ss_compute_high_shelf(SS_Biquad *c, double freq, double gain_db, double fs) {
+	ss_compute_shelf(c, gain_db, freq, fs, 0);
+}
+
+/* Standard 2nd-order lowpass */
+void ss_compute_lpf(SS_Biquad *c, double freq, double Q, double fs) {
+	const double w0 = 2.0 * M_PI * freq / fs;
+	const double cw = cos(w0), sw = sin(w0);
+	const double alpha = sw / (2.0 * Q);
+	const double b1v = 1.0 - cw;
+	const double b0v = b1v * 0.5;
+	const double a0 = 1.0 + alpha;
+	const double a1 = -2.0 * cw;
+	const double a2 = 1.0 - alpha;
+	c->b0 = b0v / a0;
+	c->b1 = b1v / a0;
+	c->b2 = b0v / a0;
+	c->a1 = a1 / a0;
+	c->a2 = a2 / a0;
+}
+
+/* Standard 2nd-order highpass */
+void ss_compute_hpf(SS_Biquad *c, double freq, double Q, double fs) {
+	const double w0 = 2.0 * M_PI * freq / fs;
+	const double cw = cos(w0), sw = sin(w0);
+	const double alpha = sw / (2.0 * Q);
+	const double b0v = (1.0 + cw) * 0.5;
+	const double b1v = -(1.0 + cw);
+	const double a0 = 1.0 + alpha;
+	const double a1 = -2.0 * cw;
+	const double a2 = 1.0 - alpha;
+	c->b0 = b0v / a0;
+	c->b1 = b1v / a0;
+	c->b2 = b0v / a0;
+	c->a1 = a1 / a0;
+	c->a2 = a2 / a0;
+}
+
+/* Pan lookup tables (128 entries, index = pan+64, range -64..63) */
+float ss_pan_table_left[128];
+float ss_pan_table_right[128];
+static int pan_tables_initialized = 0;
+
+void ss_init_insertion_pan_tables(void) {
+	if(pan_tables_initialized) return;
+	for(int pan = -64; pan <= 63; pan++) {
+		/* Computed in double and rounded on the store, as upstream does. */
+		double real_pan = (double)(pan + 64) / 127.0;
+		int idx = pan + 64;
+		ss_pan_table_left[idx] = (float)cos((M_PI / 2.0) * real_pan);
+		ss_pan_table_right[idx] = (float)sin((M_PI / 2.0) * real_pan);
+	}
+	pan_tables_initialized = 1;
+}
+
+/* LFO helpers (matching TS waveforms) */
+static inline double lfo_triangle(double phase) {
+	return 1.0 - 4.0 * fabs(phase - 0.5);
+}
+static inline double lfo_square(double phase) {
+	return phase > 0.5 ? -1.0 : -(double)cos((phase - 0.75) * 2.0 * M_PI);
+}
+static inline double lfo_sine(double phase) {
+	return sin(2.0 * M_PI * phase);
+}
+static inline double lfo_saw1(double phase) {
+	return 1.0 - 2.0 * phase;
+}
+static inline double lfo_saw2(double phase) {
+	return 2.0 * phase - 1.0;
+}
+
+double ss_compute_lfo(int wave, double phase) {
+	switch(wave) {
+		default:
+			return lfo_triangle(phase);
+		case 1:
+			return lfo_square(phase);
+		case 2:
+			return lfo_sine(phase);
+		case 3:
+			return lfo_saw1(phase);
+		case 4:
+			return lfo_saw2(phase);
+	}
+}

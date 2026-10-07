@@ -1,0 +1,112 @@
+/**
+ * midi_channel.c
+ * Per-MIDI-channel state and note management.
+ * Port of midi_channel.ts.
+ */
+
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#if __has_include(<spessasynth_core/spessasynth.h>)
+#include <spessasynth_core/midi_enums.h>
+#include <spessasynth_core/synth.h>
+#else
+#include "spessasynth/midi/midi_enums.h"
+#include "spessasynth/synthesizer/synth.h"
+#endif
+
+/* ss_voice_create / ss_voice_pool_release / ss_voice_free are declared in synth.h. */
+extern void ss_voice_release(SS_Voice *v, double current_time, double min_note_length);
+extern void ss_voice_exclusive_release(SS_Voice *v, double current_time);
+extern void ss_voice_compute_modulators(SS_Voice *v, const SS_MIDIChannel *ch, double time);
+extern void ss_voice_compute_modulators_for(SS_Voice *v, const SS_MIDIChannel *ch,
+                                            double time, int source_uses_cc, int source_index);
+extern bool ss_voice_render(SS_Voice *v, const SS_MIDIChannel *ch,
+                            double time_now,
+                            float *ol, float *or_,
+                            float *reverb,
+                            float *chorus,
+                            float *delay,
+                            int sample_count,
+                            SS_InterpolationType interp,
+                            double vol_smoothing, double filter_smoothing, double pan_smoothing);
+extern double ss_abs_cents_to_hz(int cents);
+extern size_t ss_preset_get_synthesis_data(const SS_BasicPreset *preset,
+                                           int midi_note, int velocity,
+                                           SS_SynthesisData **out);
+extern void ss_synthesis_data_free_array(SS_SynthesisData *data, size_t count);
+extern bool ss_sample_decode(SS_BasicSample *s);
+
+void ss_channel_set_custom_controller(SS_MIDIChannel *ch, SS_CustomController type, double val);
+void ss_channel_set_tuning(SS_MIDIChannel *ch, double cents);
+extern void ss_channel_reset_system_parameters(SS_MIDIChannel *ch);
+extern void ss_channel_reset_midi_parameters(SS_MIDIChannel *ch);
+extern void ss_channel_exclusive_release(SS_MIDIChannel *ch, int note, double time);
+extern void ss_channel_reset_drum_params(SS_MIDIChannel *ch);
+extern void ss_channel_reset_internal(SS_MIDIChannel *ch);
+extern void ss_channel_compute_modulators(SS_MIDIChannel *ch, double time);
+extern void ss_channel_compute_modulators_for(SS_MIDIChannel *ch, double time,
+                                              int source_uses_cc, int source_index);
+
+SS_MIDIChannel *ss_channel_new(int channel_number, struct SS_Processor *synth) {
+	SS_MIDIChannel *ch = (SS_MIDIChannel *)calloc(1, sizeof(SS_MIDIChannel));
+	if(!ch) return NULL;
+	ch->channel_number = channel_number;
+	ch->synth = synth;
+	ch->drum_channel = (channel_number % 16 == 9);
+	/* Initialize both the API-only system parameters and the MIDI
+	 * parameters. ss_channel_reset_internal() below resets the MIDI
+	 * parameters again, but leaves the system parameters untouched. */
+	ss_channel_reset_system_parameters(ch);
+	ss_channel_reset_midi_parameters(ch);
+	ss_channel_reset_drum_params(ch);
+	ss_channel_reset_internal(ch);
+	return ch;
+}
+
+void ss_channel_free(SS_MIDIChannel *ch) {
+	if(!ch) return;
+	/* Retire voices into the processor's pool so their structures (and
+	 * modulator buffers) can be reused; the pool itself is freed by
+	 * ss_processor_free() after every channel is gone. */
+	for(size_t i = 0; i < ch->voice_count; i++)
+		ss_voice_pool_release(ch->synth, ch->voices[i]);
+	free(ch->voices);
+	free(ch->sustained_voices);
+	ss_dynamic_modulator_system_free(&ch->dms);
+	free(ch);
+}
+
+/* ── Pitch wheel ─────────────────────────────────────────────────────────── */
+
+void ss_channel_pitch_wheel(SS_MIDIChannel *ch, int value, int midi_note, double time) {
+	/* value: 0..16383, 8192 = center; midi_note == -1 for channel-wide pitch wheel */
+	if(ch->locked_controllers[NON_CC_INDEX_OFFSET + SS_MODSRC_PITCH_WHEEL]) return;
+
+	if(midi_note == -1) {
+		/* Global pitch wheel: disable per-note mode */
+		ch->per_note_pitch = false;
+		ch->midi_controllers[NON_CC_INDEX_OFFSET + SS_MODSRC_PITCH_WHEEL] = (int16_t)value;
+		ss_channel_compute_modulators_for(ch, time, 0, SS_MODSRC_PITCH_WHEEL);
+	} else {
+		/* Per-note pitch wheel */
+		if(!ch->per_note_pitch) {
+			/* Entering per-note mode: seed all notes with the current global value */
+			int16_t current = ch->midi_controllers[NON_CC_INDEX_OFFSET + SS_MODSRC_PITCH_WHEEL];
+			for(int i = 0; i < 128; i++) ch->pitch_wheels[i] = current;
+		}
+		ch->per_note_pitch = true;
+		ch->pitch_wheels[midi_note] = (int16_t)value;
+		/* Recompute modulators only for active voices on this note */
+		for(size_t i = 0; i < ch->voice_count; i++) {
+			SS_Voice *v = ch->voices[i];
+			if(v && v->is_active && v->midi_note == midi_note) {
+				ss_voice_compute_modulators_for(v, ch, time, 0, SS_MODSRC_PITCH_WHEEL);
+			}
+		}
+	}
+}
+
+void ss_channel_set_pitch_wheel_range(SS_MIDIChannel *ch, int value) {
+	ch->midi_controllers[NON_CC_INDEX_OFFSET + SS_MODSRC_PITCH_WHEEL_RANGE] = value;
+}

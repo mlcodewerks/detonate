@@ -24,7 +24,7 @@ namespace
 {
     constexpr unsigned output_rate = 44100, tick_frames = output_rate / 60;
     using factory = auddecode *(*)();
-    constexpr factory factories[] = {create_common, create_openmpt, create_atari, create_wav, create_mpc, create_wv, create_vgm, create_gme, create_sid, create_v2m, create_organya, create_klystrack, create_futurecomposer, create_ken, create_adlib, create_pretracker, create_tfmx, create_hively, create_psx, create_sega, create_qsf, create_usf, create_gsf, create_snsf, create_2sf, create_uade};
+    constexpr factory factories[] = {create_midi, create_common, create_openmpt, create_atari, create_wav, create_mpc, create_wv, create_vgm, create_gme, create_sid, create_v2m, create_organya, create_klystrack, create_futurecomposer, create_ken, create_adlib, create_pretracker, create_tfmx, create_hively, create_psx, create_sega, create_qsf, create_usf, create_gsf, create_snsf, create_2sf, create_uade};
     struct temporary_audio
     {
         std::filesystem::path directory, audio;

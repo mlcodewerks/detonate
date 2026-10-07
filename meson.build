@@ -20,6 +20,7 @@ subdir('src/deps/libvgm')
 subdir('src/deps/gme')
 subdir('src/deps/unarr')
 subdir('src/deps/replays')
+subdir('src/deps/midi')
 vgm_platform = []
 vgm_deps = [zlib, math]
 if host_machine.system() == 'windows'
@@ -82,6 +83,7 @@ player = static_library('player',
   'src/player/formats/futurecomposer.cpp',
   'src/player/formats/ken.cpp',
   'src/player/formats/adlib.cpp',
+  'src/player/formats/midi.cpp',
   'src/player/formats/pretracker.cpp',
   'src/player/formats/uade.cpp',
   'src/player/formats/openmpt.cpp',
@@ -95,7 +97,7 @@ player = static_library('player',
   'src/player/formats/xsf_snsf.cpp',
   'src/player/formats/xsf_2sf.cpp',
 
-  include_directories: [inc, include_directories('src/deps/replays/AdLib/adplug/libbinio', 'src/deps/replays/SidPlay/libsidplayfp', 'src/deps/replays/HighlyAdvanced/mGBA/include')], dependencies: [wavpack, openmpt, zlib, unarr_dep, threads, cpp.find_library('dl', required: false)], link_with: [vgm, gme] + replay_libs,
+  include_directories: [inc, include_directories('src/deps/replays/AdLib/adplug/libbinio', 'src/deps/replays/SidPlay/libsidplayfp', 'src/deps/replays/HighlyAdvanced/mGBA/include')], dependencies: [wavpack, openmpt, zlib, unarr_dep, midi_dep, threads, cpp.find_library('dl', required: false)], link_with: [vgm, gme] + replay_libs,
   c_args: common_flags, cpp_args: common_flags + ['-DDETONATE_UADE_HELPER="' + uade_helper.full_path().replace('\\', '/') + '"', '-DM_CORE_GBA', '-DMINIMAL_CORE=3', '-DDISABLE_THREADING', '-DMGBA_STANDALONE'], gnu_symbol_visibility: 'hidden')
 gl_renderer = []
 gl_flags = []
@@ -117,7 +119,7 @@ imgui = static_library('imgui',
   'src/deps/imgui/imgui_sw.cpp',
   include_directories: inc, gnu_symbol_visibility: 'hidden')
 shader_renderer_sources = []
-install_data('shaders/spectrum.stoy', 'shaders/bars.stoy', 'shaders/oscilloscope.stoy', 'shaders/README.md',
+install_data('shaders/spectrum.stoy', 'shaders/bars.stoy', 'shaders/oscilloscope.stoy',
   install_dir: join_paths(meson.project_source_root(), 'compile_dir', 'shaders'))
 if get_option('gl33') or get_option('gles2')
   shader_renderer_sources += 'src/shader_renderer.cpp'
@@ -161,7 +163,7 @@ elif host_machine.system() != 'windows'
   endif
 endif
 
-foreach smoke : ['decoder', 'atari_openmpt', 'new_replays', 'replayer_settings', 'shader_format']
+foreach smoke : ['decoder', 'atari_openmpt', 'new_replays', 'replayer_settings', 'shader_format', 'midi']
   smoke_exe = executable(smoke + '-smoke', 'test/' + smoke + '_smoke.cpp',
     include_directories: inc, link_with: [player, common],
     dependencies: [wavpack, openmpt, math, threads], link_args: link_flags)

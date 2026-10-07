@@ -78,6 +78,7 @@ namespace
         unsigned video_frames = 0;
         uint64_t audio_frames = 0;
         std::string failure, pending_file;
+        std::string system_directory;
 
         ~host()
         {
@@ -111,6 +112,15 @@ namespace
         {
             switch (command)
             {
+            case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+                if (active->system_directory.empty())
+                {
+                    const char *base = SDL_GetBasePath();
+                    if (!base) return false;
+                    active->system_directory = std::string(base) + "system";
+                }
+                *static_cast<const char **>(data) = active->system_directory.c_str();
+                return true;
             case RETRO_ENVIRONMENT_SET_VARIABLES:
                 return true;
             case RETRO_ENVIRONMENT_GET_VARIABLE:

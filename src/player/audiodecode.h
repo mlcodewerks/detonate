@@ -96,5 +96,6 @@ auddecode *create_openmpt();
 auddecode *create_atari();
 
 auddecode *create_adlib();
+auddecode *create_midi();
 auddecode *create_pretracker();
 auddecode *create_uade();

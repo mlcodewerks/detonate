@@ -4,6 +4,7 @@
 #include "imgui_sw.hpp"
 #include "audiodecode.h"
 #include "player/replayer_settings.h"
+#include "player/midi_resources.h"
 #include "archive_reader.h"
 #include <algorithm>
 #include <array>
@@ -148,6 +149,9 @@ RETRO_API void retro_set_input_state(retro_input_state_t cb)
 }
 RETRO_API void retro_init()
 {
+    const char *system = nullptr;
+    if (environ_cb) environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system);
+    midi_set_system_directory(system && *system ? std::filesystem::u8path(system) : std::filesystem::path("system"));
     const char *directory = nullptr;
     if (environ_cb) environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &directory);
     std::error_code ec;
